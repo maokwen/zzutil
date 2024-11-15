@@ -39,6 +39,7 @@ add_library(zzmessage
     zzmessage.c
     errmsg.h
     basetype.h
+    basetype.c
 )
 
 target_include_directories(zzmessage PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

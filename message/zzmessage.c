@@ -16,7 +16,8 @@
 
 #ifdef _WIN32
 IN_ADDR addr_in(u8 a, u8 b, u8 c, u8 d);
-SOCKADDR_IN addr_socket_in(u8 a, u8 b, u8 c, u8 d, u16 port);
+SOCKADDR_IN addrconv_zz2win(u8 a, u8 b, u8 c, u8 d, u16 port);
+udp_address addrconv_win2zz(SOCKADDR_IN addr);
 #endif
 
 int zzmsg_is_initilized = 0;
@@ -61,7 +62,6 @@ int zzmsg_init() {
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData)) {
         printf("WSAStartup() failed\n");
-        pasue_on_exit();
         return ZZMSG_RET_OS_ERROR;
     }
 #endif
@@ -132,7 +132,6 @@ int zzmsg_join_multicast_group(udp_socket sock, ip_address group) {
     ret = setsockopt(*(SOCKET *)(sock.sock_ptr), IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&mreq, sizeof(mreq));
     if (ret) {
         printf("setsockopt() failed, code %d\n", ret);
-        pasue_on_exit();
         return ZZMSG_RET_OS_ERROR;
     }
     return ZZMSG_RET_OK;
@@ -140,17 +139,16 @@ int zzmsg_join_multicast_group(udp_socket sock, ip_address group) {
 }
 
 /* Send udp message */
-int zzmsg_send_udp(udp_socket sock, udp_address addr, u8 *data) {
+int zzmsg_send_udp(udp_socket sock, udp_address addr, u8 *data, u32 len) {
     int ret;
     if (check_init()) {
         return ZZMSG_RET_NO_INIT;
     }
 #ifdef _WIN32
-    SOCKADDR_IN dest = addr_socket_in(addr.ip.a, addr.ip.b, addr.ip.c, addr.ip.d, addr.port);
-    ret = sendto(*(SOCKET *)(sock.sock_ptr), data, strlen(data), 0, (SOCKADDR *)&dest, sizeof(SOCKADDR_IN));
-    if (ret == SOCKET_ERROR) {
-        printf("sendto() failed, code %d\n", ret);
-        pasue_on_exit();
+    SOCKADDR_IN dest = addrconv_zz2win(addr.ip.a, addr.ip.b, addr.ip.c, addr.ip.d, addr.port);
+    ret = sendto(*(SOCKET *)(sock.sock_ptr), data, len, 0, (SOCKADDR *)&dest, sizeof(SOCKADDR_IN));
+    if (ret == 0) {
+        printf("sendto() failed\n");
         return ZZMSG_RET_OS_ERROR;
     }
     return ZZMSG_RET_OK;
@@ -158,7 +156,7 @@ int zzmsg_send_udp(udp_socket sock, udp_address addr, u8 *data) {
 }
 
 /* Receive udp message */
-int zzmsg_recv_udp(udp_socket sock, udp_address *addr, u8 *buf, u32 len) {
+int zzmsg_recv_udp(udp_socket sock, udp_address *addr, u8 *buf, u32 len, u32 *receive_len) {
     int ret;
     if (check_init()) {
         return ZZMSG_RET_NO_INIT;
@@ -166,19 +164,21 @@ int zzmsg_recv_udp(udp_socket sock, udp_address *addr, u8 *buf, u32 len) {
 #ifdef _WIN32
     SOCKADDR_IN from;
     int from_len = sizeof(SOCKADDR_IN);
-    ret = recvfrom(*(SOCKET *)(sock.sock_ptr), buf, len, 0, (SOCKADDR *)&from, &from_len);
-    if (ret == SOCKET_ERROR) {
-        printf("recvfrom() failed, code %d\n", ret);
-        pasue_on_exit();
+
+    int bytes_received = recvfrom(*(SOCKET *)(sock.sock_ptr), buf, len - 1, 0, (SOCKADDR *)&from, &from_len);
+    if (bytes_received == 0) {
+        printf("recvfrom() failed\n");
         return ZZMSG_RET_OS_ERROR;
     }
-    buf[ret] = '\0';
+    if (bytes_received == len - 1) {
+        printf("buffer is too small\n");
+        return ZZMSG_RET_BUFFER_TOO_SMALL;
+    }
 
-    addr->ip.a = from.sin_addr.S_un.S_un_b.s_b1;
-    addr->ip.b = from.sin_addr.S_un.S_un_b.s_b2;
-    addr->ip.c = from.sin_addr.S_un.S_un_b.s_b3;
-    addr->ip.d = from.sin_addr.S_un.S_un_b.s_b4;
-    addr->port = ntohs(from.sin_port);
+    buf[bytes_received] = '\0';
+    *receive_len = bytes_received + 1;
+    *addr = addrconv_win2zz(from);
+
     return ZZMSG_RET_OK;
 #endif
 }
@@ -197,12 +197,22 @@ IN_ADDR addr_in(u8 a, u8 b, u8 c, u8 d) {
     return addr;
 }
 
-SOCKADDR_IN addr_socket_in(u8 a, u8 b, u8 c, u8 d, u16 port) {
+SOCKADDR_IN addrconv_zz2win(u8 a, u8 b, u8 c, u8 d, u16 port) {
     SOCKADDR_IN addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
     addr.sin_addr = addr_in(a, b, c, d);
     return addr;
+}
+
+udp_address addrconv_win2zz(SOCKADDR_IN addr) {
+    udp_address zzaddr;
+    zzaddr.ip.a = addr.sin_addr.S_un.S_un_b.s_b1;
+    zzaddr.ip.b = addr.sin_addr.S_un.S_un_b.s_b2;
+    zzaddr.ip.c = addr.sin_addr.S_un.S_un_b.s_b3;
+    zzaddr.ip.d = addr.sin_addr.S_un.S_un_b.s_b4;
+    zzaddr.port = addr.sin_port;
+    return zzaddr;
 }
 #endif

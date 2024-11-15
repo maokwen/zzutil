@@ -58,10 +58,21 @@ int main(int agrc, char *agrv[]) {
     }
 
     // receive message
+    u8 buf[1024];
+    udp_address from;
+    u32 receive_len;
+    // NOTE
     while (1) {
-        u8 buf[1024];
-        zzmsg_recv_udp(socket, &addr, buf, 1024);
-        printf("recv: %s\n", buf);
+        ret = zzmsg_recv_udp(socket, &from, buf, 1024, &receive_len);
+        if (ret) {
+            printf("recv failed\n");
+            continue;
+        } else {
+            printf("recv: %s\n", buf);
+            printf("from: %s\n", udp2str(from));
+            printf("total: %d bytes\n", receive_len);
+        }
+
         sleep(1000);
     }
 

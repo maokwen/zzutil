@@ -45,13 +45,13 @@ int main(int agrc, char *agrv[]) {
 
     // send udp message
     while (1) {
-        u8 data[] = "Hello, World!";
-        ret = zzmsg_send_udp(socket, addr, data);
+        char str[] = "Hello, World!";
+        ret = zzmsg_send_udp(socket, addr, str, strlen(str));
         if (ret) {
             pasue_on_exit();
             return ret;
         }
-        printf("send: %s\n", data);
+        printf("send: %s\n", str);
 
         sleep(1000);
     }
