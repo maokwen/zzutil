@@ -9,7 +9,6 @@
 #include <windows.h>
 #endif
 
-
 void pasue_on_exit() {
 #ifdef _WIN32
     system("pause");
@@ -25,6 +24,7 @@ void sleep(int ms) {
 int main(int agrc, char *agrv[]) {
     int ret;
 
+    // bind sockets
     ip_address ip = {239, 255, 43, 21};
     u16 port = 30040;
     udp_address addr = {ip, port};
@@ -43,16 +43,25 @@ int main(int agrc, char *agrv[]) {
         return ret;
     }
 
-    // send udp message
-    while (1) {
-        u8 data[] = "Hello, World!";
-        ret = zzmsg_send_udp(socket, addr, data);
-        if (ret) {
-            pasue_on_exit();
-            return ret;
-        }
-        printf("send: %s\n", data);
+    // bind recive socket
+    ret = zzmsg_bind_socket(socket, port);
+    if (ret) {
+        pasue_on_exit();
+        return ret;
+    }
 
+    // bind multicast group
+    ret = zzmsg_join_multicast_group(socket, ip);
+    if (ret) {
+        pasue_on_exit();
+        return ret;
+    }
+
+    // receive message
+    while (1) {
+        u8 buf[1024];
+        zzmsg_recv_udp(socket, &addr, buf, 1024);
+        printf("recv: %s\n", buf);
         sleep(1000);
     }
 

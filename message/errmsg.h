@@ -1,0 +1,3 @@
+#define ZZMSG_RET_OK 0
+#define ZZMSG_RET_NO_INIT 1
+#define ZZMSG_RET_OS_ERROR 2

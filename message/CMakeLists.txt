@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 3.5.0)
 
-project(UdpTest VERSION 0.1.0 LANGUAGES C)
-
-# set(CMAKE_CXX_STANDARD 11)
-# set(CMAKE_CXX_STANDARD_REQUIRED ON)
+project(zzmessage VERSION 0.1.0 LANGUAGES C)
 
 if(WIN32)
     SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/build")
@@ -37,18 +34,17 @@ if(UNIX)
     add_compile_definitions(_UNIX)
 endif(UNIX)
 
-add_subdirectory(message)
-
-add_executable(UdpSender
-    udpsender.c
+add_library(zzmessage
+    zzmessage.h
+    zzmessage.c
+    errmsg.h
+    basetype.h
 )
-set_target_properties(UdpSender PROPERTIES WIN32_EXECUTABLE OFF) 
-target_include_directories(UdpSender PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/message)
-target_link_libraries(UdpSender zzmessage)
 
-add_executable(UdpReceiver
-    udpreceiver.c
-)
-set_target_properties(UdpReceiver PROPERTIES WIN32_EXECUTABLE OFF) 
-target_include_directories(UdpReceiver PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/message)
-target_link_libraries(UdpReceiver zzmessage)
+target_include_directories(zzmessage PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+if(WIN32)
+    set(EXTRA_LIBS wsock32 ws2_32)
+endif(WIN32)
+
+target_link_libraries(zzmessage ${EXTRA_LIBS}) 

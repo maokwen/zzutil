@@ -1,5 +1,11 @@
 {
     "files.associations": {
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "winsock2.h": "c",
+        "stdint.h": "c",
+        "message.h": "c",
+        "basetyps.h": "c",
+        "basetype.h": "c",
+        "errmsg.h": "c"
     }
 }
