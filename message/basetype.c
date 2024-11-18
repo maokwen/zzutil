@@ -1,5 +1,7 @@
 #include "basetype.h"
 
+#include <stdio.h>
+
 char *ip2str(struct _ip_address ip) {
     static char buf[16];
     sprintf(buf, "%d.%d.%d.%d", ip.a, ip.b, ip.c, ip.d);

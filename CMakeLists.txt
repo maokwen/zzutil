@@ -26,29 +26,31 @@ if(CMAKE_VERSION VERSION_LESS "3.7.0")
 endif()
 
 if(MINGW)
-    add_compile_definitions(_MINGW)
+    add_definitions(-D_MINGW)
 endif(MINGW)
 
 if(WIN32)
-    add_compile_definitions(_WIN32)
+    add_definitions(-D_WIN32)
 endif(WIN32)
 
 if(UNIX)
-    add_compile_definitions(_UNIX)
+    add_definitions(-D_UNIX)
 endif(UNIX)
 
 add_subdirectory(message)
 
 add_executable(UdpSender
+    testutil.c
     udpsender.c
 )
 set_target_properties(UdpSender PROPERTIES WIN32_EXECUTABLE OFF) 
-target_include_directories(UdpSender PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/message)
+target_include_directories(UdpSender PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/message)
 target_link_libraries(UdpSender zzmessage)
 
 add_executable(UdpReceiver
+    testutil.c
     udpreceiver.c
 )
 set_target_properties(UdpReceiver PROPERTIES WIN32_EXECUTABLE OFF) 
-target_include_directories(UdpReceiver PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/message)
+target_include_directories(UdpReceiver PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/message)
 target_link_libraries(UdpReceiver zzmessage)

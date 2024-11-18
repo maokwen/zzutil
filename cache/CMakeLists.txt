@@ -23,19 +23,22 @@ if(CMAKE_VERSION VERSION_LESS "3.7.0")
 endif()
 
 if(MINGW)
-    add_compile_definitions(_MINGW)
+    add_definitions(-D_MINGW)
 endif(MINGW)
 
 if(WIN32)
-    add_compile_definitions(_WIN32)
+    add_definitions(-D_WIN32)
 endif(WIN32)
 
 if(UNIX)
-    add_compile_definitions(_UNIX)
+    add_definitions(-D_UNIX)
 endif(UNIX)
 
 add_library(zzcache
     zzcache.h
 )
 
-target_include_directories(zzcache PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(zzcache PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/zzutil>
+    $<INSTALL_INTERFACE:include/zzutil>
+)

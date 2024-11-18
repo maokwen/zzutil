@@ -1,4 +1,9 @@
+#ifndef ZZUTIL_ERRMSG_H
+#define ZZUTIL_ERRMSG_H
+
 #define ZZMSG_RET_OK 0
 #define ZZMSG_RET_NO_INIT 1
 #define ZZMSG_RET_OS_ERROR 2
 #define ZZMSG_RET_BUFFER_TOO_SMALL 3
+
+#endif // ZZUTIL_ERRMSG_H

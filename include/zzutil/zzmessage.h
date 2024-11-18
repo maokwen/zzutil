@@ -1,3 +1,6 @@
+#ifndef ZZUTIL_ZZMESSAGE_H
+#define ZZUTIL_ZZMESSAGE_H
+
 #include "basetype.h"
 #include "errmsg.h"
 
@@ -22,3 +25,5 @@ int zzmsg_join_multicast_group(udp_socket sock, ip_address group);
 
 /* Receive udp message */
 int zzmsg_recv_udp(udp_socket sock, udp_address *addr, u8 *buf, u32 len, u32 *recv_len);
+
+#endif // ZZUTIL_ZZMESSAGE_H

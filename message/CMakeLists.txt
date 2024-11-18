@@ -18,31 +18,27 @@ elseif(UNIX)
     SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/build")
 endif()
 
-if(CMAKE_VERSION VERSION_LESS "3.7.0")
-    set(CMAKE_INCLUDE_CURRENT_DIR ON)
-endif()
-
 if(MINGW)
-    add_compile_definitions(_MINGW)
+    add_definitions(-D_MINGW)
 endif(MINGW)
 
 if(WIN32)
-    add_compile_definitions(_WIN32)
+    add_definitions(-D_WIN32)
 endif(WIN32)
 
 if(UNIX)
-    add_compile_definitions(_UNIX)
+    add_definitions(-D_UNIX)
 endif(UNIX)
 
 add_library(zzmessage
-    zzmessage.h
     zzmessage.c
-    errmsg.h
-    basetype.h
     basetype.c
 )
 
-target_include_directories(zzmessage PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(zzmessage PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/zzutil>
+    $<INSTALL_INTERFACE:include/zzutil>
+)
 
 if(WIN32)
     set(EXTRA_LIBS wsock32 ws2_32)
