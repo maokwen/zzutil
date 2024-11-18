@@ -1,2 +1,2 @@
 void pasue_on_exit();
-void sleep(int ms);
+void dosleep(int ms);

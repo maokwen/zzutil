@@ -10,7 +10,6 @@
 int main(int agrc, char *agrv[]) {
     int ret;
 
-    // bind sockets
     ip_address ip = {239, 255, 43, 21};
     u16 port = 30040;
     udp_address addr = {ip, port};
@@ -47,8 +46,8 @@ int main(int agrc, char *agrv[]) {
     u8 buf[1024];
     udp_address from;
     u32 receive_len;
-    // NOTE
     while (1) {
+        printf("waiting for message...\n");
         ret = zzmsg_recv_udp(socket, &from, buf, 1024, &receive_len);
         if (ret) {
             printf("recv failed\n");
@@ -59,7 +58,7 @@ int main(int agrc, char *agrv[]) {
             printf("total: %d bytes\n", receive_len);
         }
 
-        sleep(1000);
+        dosleep(1000);
     }
 
     pasue_on_exit();

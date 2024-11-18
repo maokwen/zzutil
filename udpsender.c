@@ -38,7 +38,7 @@ int main(int agrc, char *agrv[]) {
         }
         printf("send: %s\n", str);
 
-        sleep(1000);
+        dosleep(1000);
     }
 
     pasue_on_exit();

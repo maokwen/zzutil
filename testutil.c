@@ -8,11 +8,11 @@ void pasue_on_exit() {
 #endif
 }
 
-void sleep(int ms) {
+void dosleep(int ms) {
 #ifdef _WIN32
     Sleep(ms);
 #endif
 #ifdef _UNIX
-    sleep(ms);
+    usleep(ms * 1000);
 #endif
 }

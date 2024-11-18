@@ -6,16 +6,24 @@
     "configurations": [
         {
             "name": "(gdb) sender",
+            "program": "${workspaceFolder}/build/UdpSender.exe",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/UdpSender.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
             "environment": [],
-            "externalConsole": true,
             "MIMode": "gdb",
-            "miDebuggerPath": "C:\\Qt\\Qt5.9.9\\Tools\\mingw530_32\\bin\\gdb.exe",
+            "windows": {
+                "program": "${workspaceFolder}/build/UdpSender.exe",
+                "miDebuggerPath": "C:\\Qt\\Qt5.9.9\\Tools\\mingw530_32\\bin\\gdb.exe",
+                "externalConsole": true,
+            },
+            "linux": {
+                "program": "${workspaceFolder}/build/UdpSender",
+                "miDebuggerPath": "/usr/bin/gdb",
+                "externalConsole": false,
+            },
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -31,17 +39,25 @@
             "preLaunchTask": "CMake: build"
         },
         {
+            "program": "${workspaceFolder}/build/UdpReceiver.exe",
             "name": "(gdb) receiver",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/UdpReceiver.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
             "environment": [],
-            "externalConsole": true,
             "MIMode": "gdb",
-            "miDebuggerPath": "C:\\Qt\\Qt5.9.9\\Tools\\mingw530_32\\bin\\gdb.exe",
+            "windows": {
+                "program": "${workspaceFolder}/build/UdpReceiver.exe",
+                "miDebuggerPath": "C:\\Qt\\Qt5.9.9\\Tools\\mingw530_32\\bin\\gdb.exe",
+                "externalConsole": true,
+            },
+            "linux": {
+                "program": "${workspaceFolder}/build/UdpReceiver",
+                "miDebuggerPath": "/usr/bin/gdb",
+                "externalConsole": false,
+            },
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
