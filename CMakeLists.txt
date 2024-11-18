@@ -37,20 +37,18 @@ if(UNIX)
     add_definitions(-D_UNIX)
 endif(UNIX)
 
-add_subdirectory(message)
+add_subdirectory(zzutil)
 
 add_executable(UdpSender
     testutil.c
     udpsender.c
 )
-set_target_properties(UdpSender PROPERTIES WIN32_EXECUTABLE OFF) 
-target_include_directories(UdpSender PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/message)
-target_link_libraries(UdpSender zzmessage)
+set_target_properties(UdpSender PROPERTIES WIN32_EXECUTABLE OFF)
+target_link_libraries(UdpSender zzutil::zzmessage)
 
 add_executable(UdpReceiver
     testutil.c
     udpreceiver.c
 )
-set_target_properties(UdpReceiver PROPERTIES WIN32_EXECUTABLE OFF) 
-target_include_directories(UdpReceiver PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/message)
-target_link_libraries(UdpReceiver zzmessage)
+set_target_properties(UdpReceiver PROPERTIES WIN32_EXECUTABLE OFF)
+target_link_libraries(UdpReceiver zzutil::zzmessage)

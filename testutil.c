@@ -1,5 +1,7 @@
 #ifdef _WIN32
 #include <windows.h>
+#elif _UNIX
+#include <unistd.h>
 #endif
 
 void pasue_on_exit() {

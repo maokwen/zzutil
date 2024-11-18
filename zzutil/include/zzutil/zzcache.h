@@ -1,0 +1,5 @@
+#ifndef ZZUTIL_ZZCACHE_H
+#define ZZUTIL_ZZCACHE_H
+
+
+#endif // ZZUTIL_ZZCACHE_H
