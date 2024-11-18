@@ -39,6 +39,9 @@ unsigned int hash(const char *key);
 /* remove a node in entry node list */
 cache_entry *inplace_remove_node(zzcache *table, int slot, cache_entry *curr, cache_entry *prev);
 
+/* find and remove node */
+cache_entry *find_and_remove_node_list(zzcache *table, cache_entry *curr);
+
 /* routine to clean up expired entry */
 void *expire_check_routine(void *arg);
 
@@ -47,6 +50,7 @@ void *thread_cleanup_routine(void *arg);
 
 /* stop thread and free memory */
 void on_destory(zzcache *table);
+
 
 zzcache *zzcache_create_table() {
     zzcache *table = malloc(sizeof(zzcache));
@@ -193,6 +197,21 @@ cache_entry *inplace_remove_node(zzcache *table, int slot, cache_entry *curr, ca
     return prev;
 }
 
+cache_entry *find_and_remove_node_list(zzcache *table, cache_entry *curr) {
+    cache_entry *next = curr->next;
+    int slot = hash(curr->key);
+    cache_entry *entry = table->entries[slot];
+    cache_entry *prev = NULL;
+    while (entry != NULL) {
+        if (entry == curr) {
+            prev = inplace_remove_node(table, slot, entry, prev);
+            return next;
+        }
+        prev = entry;
+        entry = entry->next;
+    }
+}
+
 void *expire_check_routine(void *arg) {
     zzcache *table = (zzcache *)arg;
 
@@ -236,7 +255,8 @@ void *expire_check_routine(void *arg) {
         pthread_rwlock_wrlock(table->rwlock);
         {
             // NOTE: optimize this
-            for (cache_entry *entry = to_remove_list->next; entry != NULL; entry = entry->next) {
+            while (to_remove_list->next != NULL) {
+                to_remove_list->next = find_and_remove_node_list(table, to_remove_list->next);
             }
         }
         pthread_rwlock_unlock(table->rwlock);
