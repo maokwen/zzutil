@@ -343,7 +343,7 @@ int set_socket_reusable(udp_socket sock) {
 #ifdef _UNIX
     int ret = 0;
     int *psock = (int *)sock.sock_ptr;
-    setsockopt(*(int*)(sock.sock_ptr), SOL_SOCKET, SO_REUSEADDR, (char *)&ret, sizeof(ret));
+    setsockopt(*(int *)(sock.sock_ptr), SOL_SOCKET, SO_REUSEADDR, (char *)&ret, sizeof(ret));
     if (ret) {
         printf("setsockopt() failed, code %d\n", ret);
         return ZZMSG_RET_OS_ERROR;

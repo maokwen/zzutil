@@ -61,7 +61,7 @@ int main(int agrc, char *agrv[]) {
         dosleep(1000);
     }
 
-    ret =  zzmsg_close_socket(socket);
+    ret = zzmsg_close_socket(socket);
     if (ret) {
         pasue_on_exit();
         return ret;
