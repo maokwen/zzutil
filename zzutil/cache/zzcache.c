@@ -51,7 +51,6 @@ void *thread_cleanup_routine(void *arg);
 /* stop thread and free memory */
 void on_destory(zzcache *table);
 
-
 zzcache *zzcache_create_table() {
     zzcache *table = malloc(sizeof(zzcache));
     table->on_exit = 0;
