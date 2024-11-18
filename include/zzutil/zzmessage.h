@@ -26,4 +26,7 @@ int zzmsg_join_multicast_group(udp_socket sock, ip_address group);
 /* Receive udp message */
 int zzmsg_recv_udp(udp_socket sock, udp_address *addr, u8 *buf, u32 len, u32 *recv_len);
 
+/* Close socket */
+int zzmsg_close_socket(udp_socket sock);
+
 #endif // ZZUTIL_ZZMESSAGE_H

@@ -15,6 +15,7 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <sys/socket.h>
+#include <unistd.h>
 // #include <arpa/inet.h>
 #endif
 
@@ -121,6 +122,12 @@ int zzmsg_bind_socket(udp_socket sock, u16 port) {
         printf("bind() failed, code %d\n", ret);
         return ret;
     }
+
+    ret = bind(*(int *)(sock.sock_ptr), (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
+    if (ret) {
+        printf("bind() failed, code %d\n", ret);
+        return ZZMSG_RET_OS_ERROR;
+    }
 #endif
 
     printf("bind() success\n");
@@ -154,7 +161,6 @@ int zzmsg_join_multicast_group(udp_socket sock, ip_address group) {
         printf("setsockopt() failed, code %d\n", ret);
         return ZZMSG_RET_OS_ERROR;
     }
-
 #endif
 
     printf("join multicast group success\n");
@@ -231,6 +237,24 @@ int zzmsg_recv_udp(udp_socket sock, udp_address *addr, u8 *buf, u32 len, u32 *re
     buf[bytes_received] = '\0';
     *receive_len = bytes_received + 1;
     *addr = addrconv_unix2zz(from);
+#endif
+
+    return ZZMSG_RET_OK;
+}
+
+int zzmsg_close_socket(udp_socket sock) {
+    if (check_init()) {
+        return ZZMSG_RET_NO_INIT;
+    }
+
+#ifdef _WIN32
+    closesocket(*(SOCKET *)(sock.sock_ptr));
+    free(sock.sock_ptr);
+#endif
+
+#ifdef _UNIX
+    close(*(int *)(sock.sock_ptr));
+    free(sock.sock_ptr);
 #endif
 
     return ZZMSG_RET_OK;
