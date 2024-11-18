@@ -8,7 +8,7 @@
 
 要能够以统一的形式收发 UDP 包。
 
-参见头文件：[zzmessage.h](zzmessage.h)。
+参见头文件：[zzmessage.h](inlcude/zzutil/zzmessage.h)。
 
 ### 数据包缓存
 
