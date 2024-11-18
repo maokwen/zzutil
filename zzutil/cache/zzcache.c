@@ -1,12 +1,15 @@
 #include "zzcache.h"
 #include "errmsg.h"
 
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #ifdef _WIN32
 #elif _UNIX
 #include <pthread.h>
+#include <unistd.h>
 #endif
 
 #define TABLE_SIZE 100
@@ -14,19 +17,19 @@
 #define CLEANUP_INTERVAL_MILISEC 20                   // 20 milliseconds
 #define MAXIMUM_DUP_KEY_NUMBER 10
 
-typedef struct {
+typedef struct cache_entry_t {
     char *key;
     char *value;
     clock_t expire;
-    struct cache_entry *next;
+    struct cache_entry_t *next;
 } cache_entry;
 
 struct zzcache {
     cache_entry *entries[TABLE_SIZE];
 #ifdef _UNIX
-    pthread_t thread;
+    pthread_t *thread;
     pthread_rwlock_t *rwlock;
-    int start_thread;
+    int on_exit;
 #endif
 };
 
@@ -37,38 +40,42 @@ unsigned int hash(const char *key);
 cache_entry *inplace_remove_node(zzcache *table, int slot, cache_entry *curr, cache_entry *prev);
 
 /* routine to clean up expired entry */
-void *cleanup_routine(void *arg);
+void *expire_check_routine(void *arg);
+
+/* routine to cleanup thread before kill a thread */
+void *thread_cleanup_routine(void *arg);
 
 /* stop thread and free memory */
-void cleanup(zzcache *table);
+void on_destory(zzcache *table);
 
 zzcache *zzcache_create_table() {
     zzcache *table = malloc(sizeof(zzcache));
+    table->on_exit = 0;
     for (int i = 0; i < TABLE_SIZE; i++) {
         table->entries[i] = NULL;
     }
-    table->thread = NULL;
-    table->rwlock = NULL;
 
-    // create a new thread to clean up expired entries
     int ret;
-    pthread_t thread;
+    // create a new thread to clean up expired entries
+    table->thread = (pthread_t *)malloc(sizeof(pthread_t));
     ret = pthread_create(
-        &table->thread,
+        table->thread,
         NULL,
-        cleanup_routine,
+        expire_check_routine,
         table);
-    if (thread == 0) {
+    if (ret) {
         printf("Failed to create thread");
-        cleanup(table);
+        on_destory(table);
         return NULL;
     }
+    // pthread_cleanup_push(thread_cleanup_routine, table);
+
     // init rw lock
     table->rwlock = malloc(sizeof(pthread_rwlock_t));
     ret = pthread_rwlock_init(table->rwlock, NULL);
-    if (ret != 0) {
+    if (ret) {
         printf("Failed to init rwlock");
-        cleanup(table);
+        on_destory(table);
         return NULL;
     }
 
@@ -76,7 +83,18 @@ zzcache *zzcache_create_table() {
 }
 
 void zzcache_free_table(zzcache *table) {
-    cleanup(table);
+    table->on_exit = 1;
+    // create a new thread to join the table thread
+    pthread_t thread;
+    int ret = pthread_create(
+        &thread,
+        NULL,
+        thread_cleanup_routine,
+        table);
+    if (ret) {
+        printf("Failed to create cleanup thread");
+        return;
+    }
 }
 
 void zzcache_insert(zzcache *table, const char *key, const char *value) {
@@ -175,19 +193,17 @@ cache_entry *inplace_remove_node(zzcache *table, int slot, cache_entry *curr, ca
     return prev;
 }
 
-void *cleanup_routine(void *arg) {
+void *expire_check_routine(void *arg) {
     zzcache *table = (zzcache *)arg;
-    // wait for cond to run
-    // pthread_mutex_lock(&table->mutex);
-    // while (!table->start_thread) {
-    //     pthread_cond_wait(&table->cond, &table->mutex);
-    // }
-    // pthread_mutex_unlock(&table->mutex);
 
     printf("Thread started\n");
 
     clock_t now;
     while (1) {
+        if (table->on_exit) {
+            break;
+        }
+
         cache_entry *to_remove_list = malloc(sizeof(cache_entry));
 
         // record entries to remove
@@ -225,11 +241,22 @@ void *cleanup_routine(void *arg) {
         }
         pthread_rwlock_unlock(table->rwlock);
 
-        nsleep(CLEANUP_INTERVAL_MILISEC * 1000);
+        usleep(CLEANUP_INTERVAL_MILISEC * 1000);
     }
 }
 
-void cleanup(zzcache *table) {
+void *thread_cleanup_routine(void *arg) {
+    zzcache *table = (zzcache *)arg;
+    int ret = pthread_join(*(table->thread), NULL);
+    if (ret) {
+        printf("Failed to join thread");
+    }
+    printf("Thread joined\n");
+    on_destory(table);
+    return NULL;
+}
+
+void on_destory(zzcache *table) {
     if (table == NULL) {
         return;
     }
@@ -247,7 +274,7 @@ void cleanup(zzcache *table) {
     }
     int ret;
     if (table->thread) {
-        ret = pthread_cancel(table->thread);
+        ret = pthread_cancel(*(table->thread));
         if (ret != 0) {
             printf("Failed to cancel thread");
         }
