@@ -38,8 +38,8 @@ add_library(zzmessage
 )
 
 target_include_directories(zzmessage PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/zzutil>
-    $<INSTALL_INTERFACE:include/zzutil>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
 )
 
 if(WIN32)
@@ -54,8 +54,8 @@ add_library(zzcache
 )
 
 target_include_directories(zzcache PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/zzutil>
-    $<INSTALL_INTERFACE:include/zzutil>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
 )
 
 if(UNIX)

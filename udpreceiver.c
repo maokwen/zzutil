@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <zzmessage.h>
+#include <zzutil/zzmessage.h>
 
 #include "testutil.h"
 

@@ -1,4 +1,4 @@
-#include "zzmessage.h"
+#include "zzutil/zzmessage.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,7 +11,7 @@
 #ifndef __USE_MISC
 #define __USE_MISC
 #endif
-#include "zzmessage.h"
+#include "zzutil/zzmessage.h"
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <sys/socket.h>
