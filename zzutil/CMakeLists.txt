@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5.0)
 
-project(zzmessage VERSION 0.1.0 LANGUAGES C)
+project(zzutil VERSION 0.1.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 99)
 
@@ -26,6 +26,7 @@ endif(MINGW)
 
 if(WIN32)
     add_definitions(-D_WIN32)
+    add_definitions(-D_WIN32_WINNT=0x0600) # Windows Vista and up
 endif(WIN32)
 
 if(UNIX)

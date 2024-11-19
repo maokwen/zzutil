@@ -1,12 +1,17 @@
 #include "zzutil/zzcache.h"
 #include "zzutil/errmsg.h"
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 #ifdef _WIN32
+#include <wtypes.h>
+#include <winbase.h>
+#include <processthreadsapi.h>
+#include <synchapi.h>
 #elif _UNIX
 #include <pthread.h>
 #include <unistd.h>
@@ -26,24 +31,37 @@ typedef struct cache_entry_t {
 
 struct zzcache {
     cache_entry *entries[TABLE_SIZE];
-#ifdef _UNIX
+#ifdef _WIN32
+    HANDLE thread;
+    DWORD dwThreadId;
+    SRWLOCK rwlock;
+#elif _UNIX
     pthread_t *thread;
     pthread_rwlock_t *rwlock;
-    int on_exit;
 #endif
+    int on_exit;
 };
 
-/* calcu hash */
-unsigned int hash(char *key);
-
 /* routine to clean up expired entry */
-void *expire_check_routine(void *arg);
+#ifdef _WIN32
+static DWORD WINAPI expire_check_routine(LPVOID lpParam);
+static DWORD WINAPI thread_cleanup_routine(LPVOID lpParam);
+#elif _UNIX
+static void *thread_cleanup_routine(void *arg);
+static void *expire_check_routine(void *arg);
+#endif
 
+/* calcu hash */
+static unsigned int hash(char *key);
 /* routine to cleanup thread before kill a thread */
-void *thread_cleanup_routine(void *arg);
-
 /* stop thread and free memory */
-void on_destory(zzcache *table);
+static void on_destory(zzcache *table);
+/* sleep */
+static void dosleep(int ms);
+/* write lock */
+static void wrlock(zzcache *table, bool lock);
+/* read lock */
+static void rdlock(zzcache *table, bool lock);
 
 zzcache *zzcache_create_table() {
     zzcache *table = malloc(sizeof(zzcache));
@@ -52,8 +70,23 @@ zzcache *zzcache_create_table() {
         table->entries[i] = NULL;
     }
 
-    int ret;
     // create a new thread to clean up expired entries
+#ifdef _WIN32
+    table->thread = CreateThread(
+        NULL,
+        0,
+        expire_check_routine,
+        table,
+        0,
+        &table->dwThreadId);
+    if (table->thread == NULL) {
+        printf("Failed to create thread");
+        on_destory(table);
+        return NULL;
+    }
+#endif
+#ifdef _UNIX
+    int ret;
     table->thread = (pthread_t *)malloc(sizeof(pthread_t));
     ret = pthread_create(
         table->thread,
@@ -65,9 +98,13 @@ zzcache *zzcache_create_table() {
         on_destory(table);
         return NULL;
     }
-    // pthread_cleanup_push(thread_cleanup_routine, table);
+#endif
 
     // init rw lock
+#ifdef _WIN32
+    InitializeSRWLock(&table->rwlock);
+#endif
+#ifdef _UNIX
     table->rwlock = malloc(sizeof(pthread_rwlock_t));
     ret = pthread_rwlock_init(table->rwlock, NULL);
     if (ret) {
@@ -75,6 +112,7 @@ zzcache *zzcache_create_table() {
         on_destory(table);
         return NULL;
     }
+#endif
 
     return table;
 }
@@ -82,6 +120,20 @@ zzcache *zzcache_create_table() {
 void zzcache_free_table(zzcache *table) {
     table->on_exit = 1;
     // create a new thread to join the table thread
+#ifdef _WIN32
+    HANDLE thread = CreateThread(
+        NULL,
+        0,
+        thread_cleanup_routine,
+        table,
+        0,
+        NULL);
+    if (thread == NULL) {
+        printf("Failed to create cleanup thread");
+        return;
+    }
+#endif
+#ifdef _UNIX
     pthread_t thread;
     int ret = pthread_create(
         &thread,
@@ -92,12 +144,13 @@ void zzcache_free_table(zzcache *table) {
         printf("Failed to create cleanup thread");
         return;
     }
+#endif
 }
 
 void zzcache_insert(zzcache *table, char *key, u8 *value) {
     unsigned int slot = hash(key);
 
-    pthread_rwlock_wrlock(table->rwlock);
+    wrlock(table, true);
     {
         clock_t expire = clock() + TICKS_TO_EXPIRE;
         cache_entry *curr = table->entries[slot];
@@ -122,14 +175,14 @@ void zzcache_insert(zzcache *table, char *key, u8 *value) {
             table->entries[slot] = entry;
         }
     }
-    pthread_rwlock_wrlock(table->rwlock);
+    wrlock(table, false);
 }
 
 u8 *zzcache_find(zzcache *table, char *key) {
     unsigned int slot = hash(key);
     char *value = NULL;
 
-    pthread_rwlock_rdlock(table->rwlock);
+    rdlock(table, true);
     {
         cache_entry *entry = table->entries[slot];
         while (entry != NULL) {
@@ -140,7 +193,7 @@ u8 *zzcache_find(zzcache *table, char *key) {
             entry = entry->next;
         }
     }
-    pthread_rwlock_unlock(table->rwlock);
+    rdlock(table, false);
 
     return value;
 }
@@ -148,7 +201,7 @@ u8 *zzcache_find(zzcache *table, char *key) {
 void zzcache_remove(zzcache *table, char *key) {
     unsigned int slot = hash(key);
 
-    pthread_rwlock_wrlock(table->rwlock);
+    wrlock(table, true);
     {
         cache_entry *entry = table->entries[slot];
         cache_entry *prev = NULL;
@@ -168,7 +221,7 @@ void zzcache_remove(zzcache *table, char *key) {
             entry = entry->next;
         }
     }
-    pthread_rwlock_unlock(table->rwlock);
+    wrlock(table, false);
 }
 
 /* SECTION implement */
@@ -181,8 +234,13 @@ unsigned int hash(char *key) {
     return hash % TABLE_SIZE;
 }
 
+#ifdef _WIN32
+DWORD WINAPI expire_check_routine(LPVOID lpParam) {
+    zzcache *table = (zzcache *)lpParam;
+#elif _UNIX
 void *expire_check_routine(void *arg) {
     zzcache *table = (zzcache *)arg;
+#endif
 
     printf("Expire check thread started.\n");
 
@@ -191,7 +249,7 @@ void *expire_check_routine(void *arg) {
             break;
         }
 
-        pthread_rwlock_wrlock(table->rwlock);
+        wrlock(table, true);
         {
             clock_t now = clock();
             for (int i = 0; i < TABLE_SIZE; i++) {
@@ -216,12 +274,24 @@ void *expire_check_routine(void *arg) {
                 }
             }
         }
-        pthread_rwlock_unlock(table->rwlock);
+        wrlock(table, false);
 
-        usleep(CLEANUP_INTERVAL_MILISEC * 1000);
+        dosleep(CLEANUP_INTERVAL_MILISEC);
     }
 }
 
+#ifdef _WIN32
+DWORD WINAPI thread_cleanup_routine(LPVOID lpParam) {
+    zzcache *table = (zzcache *)lpParam;
+    int ret = WaitForSingleObject(table->thread, INFINITE);
+    if (ret == WAIT_FAILED) {
+        printf("Failed to wait for thread");
+    }
+    CloseHandle(table->thread);
+    on_destory(table);
+    return 0;
+}
+#elif _UNIX
 void *thread_cleanup_routine(void *arg) {
     zzcache *table = (zzcache *)arg;
     int ret = pthread_join(*(table->thread), NULL);
@@ -232,6 +302,7 @@ void *thread_cleanup_routine(void *arg) {
     on_destory(table);
     return NULL;
 }
+#endif
 
 void on_destory(zzcache *table) {
     if (table == NULL) {
@@ -249,6 +320,10 @@ void on_destory(zzcache *table) {
             }
         }
     }
+#ifdef _WIN32
+// TODO -
+#endif
+#ifdef _UNIX
     int ret;
     if (table->thread) {
         ret = pthread_cancel(*(table->thread));
@@ -264,7 +339,51 @@ void on_destory(zzcache *table) {
         }
         table->rwlock = NULL;
     }
+#endif
     free(table);
+}
+
+void wrlock(zzcache *table, bool lock) {
+#ifdef _WIN32
+    if (lock) {
+        AcquireSRWLockExclusive(&table->rwlock);
+    } else {
+        ReleaseSRWLockExclusive(&table->rwlock);
+    }
+#endif
+#ifdef _UNIX
+    if (lock) {
+        pthread_rwlock_wrlock(table->rwlock);
+    } else {
+        pthread_rwlock_unlock(table->rwlock);
+    }
+#endif
+}
+
+void rdlock(zzcache *table, bool lock) {
+#ifdef _WIN32
+    if (lock) {
+        AcquireSRWLockShared(&table->rwlock);
+    } else {
+        ReleaseSRWLockShared(&table->rwlock);
+    }
+#endif
+#ifdef _UNIX
+    if (lock) {
+        pthread_rwlock_rdlock(table->rwlock);
+    } else {
+        pthread_rwlock_unlock(table->rwlock);
+    }
+#endif
+}
+
+void dosleep(int ms) {
+#ifdef _WIN32
+    Sleep(ms);
+#endif
+#ifdef _UNIX
+    usleep(ms * 1000);
+#endif
 }
 
 /* !SECTION implement */
