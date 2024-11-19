@@ -13,8 +13,9 @@
 #endif
 
 #define TABLE_SIZE 100
-#define TICKS_TO_EXPIRE (CLOCKS_PER_SEC / 1000 * 200) // 200 milliseconds
-#define CLEANUP_INTERVAL_MILISEC 50                   // 50 milliseconds
+#define TICKS_PER_MILI_SEC (CLOCKS_PER_SEC / 1000)
+#define TICKS_TO_EXPIRE TICKS_PER_MILI_SEC * 200 // 200 milliseconds
+#define CLEANUP_INTERVAL_MILISEC 50              // 50 milliseconds
 
 typedef struct cache_entry_t {
     char *key;
@@ -183,9 +184,8 @@ unsigned int hash(char *key) {
 void *expire_check_routine(void *arg) {
     zzcache *table = (zzcache *)arg;
 
-    printf("Thread started\n");
+    printf("Expire check thread started.\n");
 
-    clock_t now;
     while (1) {
         if (table->on_exit) {
             break;
@@ -193,7 +193,7 @@ void *expire_check_routine(void *arg) {
 
         pthread_rwlock_wrlock(table->rwlock);
         {
-            now = clock();
+            clock_t now = clock();
             for (int i = 0; i < TABLE_SIZE; i++) {
                 cache_entry *entry = table->entries[i];
                 cache_entry *prev = NULL;

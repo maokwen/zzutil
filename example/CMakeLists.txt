@@ -47,3 +47,11 @@ add_executable(UdpReceiver
 )
 set_target_properties(UdpReceiver PROPERTIES WIN32_EXECUTABLE OFF)
 target_link_libraries(UdpReceiver zzutil::zzmessage)
+
+add_executable(CacheTest
+    testutil.c
+    cachetest.c
+)
+set_target_properties(CacheTest PROPERTIES WIN32_EXECUTABLE OFF)
+target_link_libraries(CacheTest zzutil::zzcache)
+
