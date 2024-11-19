@@ -34,6 +34,8 @@
 
 ## 示例程序
 
+在 `example` 目录下。
+
 ### Build
 
 You need to have `cmake` and `mingw` installed.
