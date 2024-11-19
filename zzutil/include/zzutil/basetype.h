@@ -12,6 +12,11 @@ struct _udp_socket {
     void *sock_ptr;
 };
 
+struct _mac_address {
+    u8 is_valid;
+    u8 addr[6];
+};
+
 struct _ip_address {
     u8 a, b, c, d;
 };

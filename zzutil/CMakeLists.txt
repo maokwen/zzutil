@@ -44,7 +44,7 @@ target_include_directories(zzmessage PUBLIC
 )
 
 if(WIN32)
-    set(ZZMESSAGE_ADDITIONAL_LIBS wsock32 ws2_32)
+    set(ZZMESSAGE_ADDITIONAL_LIBS wsock32 ws2_32 iphlpapi)
 endif(WIN32)
 
 target_link_libraries(zzmessage ${ZZMESSAGE_ADDITIONAL_LIBS}) 
