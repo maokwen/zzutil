@@ -24,7 +24,7 @@
 #endif
 
 #ifdef _WIN32
-static IN_ADDR addr_in(u8 a, u8 b, u8 c, u8 d);
+static IN_ADDR ipconv_zz2win(u8 a, u8 b, u8 c, u8 d);
 static SOCKADDR_IN addrconv_zz2win(u8 a, u8 b, u8 c, u8 d, u16 port);
 static udp_address addrconv_win2zz(SOCKADDR_IN addr);
 /* convert mac address string to mac_address */
@@ -156,9 +156,8 @@ int zzmsg_join_multicast_group(udp_socket sock, ip_address group) {
 
 #ifdef _WIN32
     struct ip_mreq mreq;
-    mreq.imr_multiaddr = addr_in(group.a, group.b, group.c, group.d);
-    char ip[] = "192.168.28.189";
-    mreq.imr_interface.s_addr = inet_addr(ip);
+    mreq.imr_multiaddr = ipconv_zz2win(group.a, group.b, group.c, group.d);
+    mreq.imr_interface.s_addr = htonl(INADDR_ANY);
     ret = setsockopt(*(SOCKET *)(sock.sock_ptr), IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&mreq, sizeof(mreq));
     if (ret) {
         printf("setsockopt() failed, code %d\n", ret);
@@ -460,7 +459,17 @@ int zzmsg_get_all_interfaces(adapter_info **ifs, u32 *count) {
 
 #ifdef _WIN32
 
-IN_ADDR addr_in(u8 a, u8 b, u8 c, u8 d) {
+void print_in_addr(struct in_addr addr) {
+    char ip_str[INET_ADDRSTRLEN];
+    if (inet_ntop(AF_INET, &addr, ip_str, sizeof(ip_str)) == NULL) {
+        printf("inet_ntop failed\n");
+        perror("inet_ntop");
+        exit(EXIT_FAILURE);
+    }
+    printf("IPv4 Address: %s\n", ip_str);
+}
+
+IN_ADDR ipconv_zz2win(u8 a, u8 b, u8 c, u8 d) {
     IN_ADDR addr;
     addr.S_un.S_addr = htonl(a << 24 | b << 16 | c << 8 | d);
     return addr;
@@ -471,7 +480,7 @@ SOCKADDR_IN addrconv_zz2win(u8 a, u8 b, u8 c, u8 d, u16 port) {
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    addr.sin_addr = addr_in(a, b, c, d);
+    addr.sin_addr = ipconv_zz2win(a, b, c, d);
     return addr;
 }
 
@@ -589,7 +598,7 @@ int set_socket_if(udp_socket sock, ip_address ip) {
         return ZZMSG_RET_NO_INIT;
     }
 #ifdef _WIN32
-    IN_ADDR addr = addr_in(ip.a, ip.b, ip.c, ip.d);
+    IN_ADDR addr = ipconv_zz2win(ip.a, ip.b, ip.c, ip.d);
     ret = setsockopt(*(SOCKET *)(sock.sock_ptr), IPPROTO_IP, IP_MULTICAST_IF, (const char *)&addr, sizeof(addr));
     if (ret) {
         printf("setsockopt(if) failed, code %d\n", ret);
