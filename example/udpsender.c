@@ -42,7 +42,7 @@ int main(int agrc, char *agrv[]) {
     for (u32 i = 0; i < count; i++) {
         printf("name: %s\n", ifs[i].name);
         if (ifs[i].mac.is_valid) {
-            printf("mac: %2lX:%2lX:%2lX:%2lX:%2lX:%2lX\n", ifs[i].mac.addr[0], ifs[i].mac.addr[1], ifs[i].mac.addr[2], ifs[i].mac.addr[3], ifs[i].mac.addr[4], ifs[i].mac.addr[5]);
+            printf("mac: %02X:%02X:%02X:%02X:%02X:%02X\n", ifs[i].mac.addr[0], ifs[i].mac.addr[1], ifs[i].mac.addr[2], ifs[i].mac.addr[3], ifs[i].mac.addr[4], ifs[i].mac.addr[5]);
         }
         for (int j = 0; j < ifs[i].ip_count; j++) {
             printf("ip: %s\n", ip2str(ifs[i].ip[j]));
@@ -51,6 +51,7 @@ int main(int agrc, char *agrv[]) {
                 break;
             }
         }
+        printf("\n");
     }
     printf("local ip: %s\n", ip2str(local_ip));
 

@@ -375,6 +375,7 @@ int zzmsg_get_all_interfaces(adapter_info **ifs, u32 *count) {
         if (ifa->ifa_addr == NULL)
             continue;
         if (ifa->ifa_addr->sa_family == AF_INET) {
+            // TODO: drop gateway address
             // record interface name & ip address
             found = 0;
             for (int i = 0; i <= ifname_count; i++) {

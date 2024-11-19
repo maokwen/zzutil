@@ -61,6 +61,7 @@ int main(int agrc, char *agrv[]) {
                 break;
             }
         }
+        printf("\n");
     }
     printf("local ip: %s\n", ip2str(local_ip));
 
