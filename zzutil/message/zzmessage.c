@@ -12,13 +12,15 @@
 #ifndef __USE_MISC
 #define __USE_MISC
 #endif
-#include "zzmessage.h"
-#include "zzutil/zzmessage.h"
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <netdb.h>
+#include <ifaddrs.h>
 #include <unistd.h>
-// #include <arpa/inet.h>
+#include <netpacket/packet.h>
 #endif
 
 #ifdef _WIN32
@@ -33,6 +35,8 @@ static mac_address addrconv_win2mac(u8 *mac);
 static in_addr_t ipconv_zz2unix(u8 a, u8 b, u8 c, u8 d);
 static struct sockaddr_in addrconv_zz2unix(u8 a, u8 b, u8 c, u8 d, u16 port);
 static udp_address addrconv_unix2zz(struct sockaddr_in addr);
+static mac_address macconv_unix2zz(struct sockaddr_ll *addr);
+static ip_address ipconv_unix2zz(struct sockaddr_in *addr);
 #endif
 
 static int zzmsg_is_initilized = 0;
@@ -351,7 +355,101 @@ int zzmsg_get_all_interfaces(adapter_info **ifs, u32 *count) {
 #endif
 
 #ifdef _UNIX
-// TODO
+    int ret;
+    struct ifaddrs *ifaddr, *ifa;
+    ret = getifaddrs(&ifaddr);
+    if (ret) {
+        printf("getifaddrs() failed\n");
+        return ZZMSG_RET_OS_ERROR;
+    }
+
+    int found;
+    int ifname_count = 0;
+    int mapIfIndex[100];
+    char **ifname_list = (char **)malloc(100 * sizeof(char *));
+    ip_address *ip_list = (ip_address *)malloc(100 * sizeof(ip_address));
+    mac_address *mac_list = (mac_address *)malloc(100 * sizeof(mac_address));
+    memset(mapIfIndex, -1, sizeof(mapIfIndex));
+
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL)
+            continue;
+        if (ifa->ifa_addr->sa_family == AF_INET) {
+            // record interface name & ip address
+            found = 0;
+            for (int i = 0; i <= ifname_count; i++) {
+                if (strcmp(ifa->ifa_name, ifname_list[i]) == 0) {
+                    mapIfIndex[ifname_count] = i;
+                    found = 1;
+                    break;
+                }
+            }
+            if (!found) {
+                mapIfIndex[ifname_count] = ifname_count;
+            }
+            ifname_list[ifname_count] = strdup(ifa->ifa_name);
+            ip_list[ifname_count] = ipconv_unix2zz((struct sockaddr_in *)ifa->ifa_addr);
+            ifname_count += 1;
+        } else if (ifa->ifa_addr->sa_family == AF_PACKET) {
+            // record interface name & mac address
+            found = 0;
+            for (int i = 0; i <= ifname_count; i++) {
+                if (strcmp(ifa->ifa_name, ifname_list[i]) == 0) {
+                    mapIfIndex[ifname_count] = i;
+                    found = 1;
+                    break;
+                }
+            }
+            if (!found) {
+                mapIfIndex[ifname_count] = ifname_count;
+            }
+            ifname_list[ifname_count] = strdup(ifa->ifa_name);
+            mac_list[ifname_count] = macconv_unix2zz((struct sockaddr_ll *)ifa->ifa_addr);
+            ifname_count += 1;
+        } else {
+            continue;
+        }
+    }
+    freeifaddrs(ifaddr);
+
+    *ifs = (adapter_info *)malloc(ifname_count * sizeof(adapter_info));
+    int real_count = 0;
+    for (int i = 0; i < ifname_count; i++) {
+        int real_idx = mapIfIndex[i];
+        if (real_idx == -1) {
+            continue;
+        } else if (real_idx == i) {
+            (*ifs)[i].name = ifname_list[i];
+            (*ifs)[i].mac = mac_list[i];
+            (*ifs)[i].ip_count = 1;
+            real_count += 1;
+        } else {
+            (*ifs)[real_idx].ip_count += 1;
+        }
+    }
+    int ifCountMap[100];
+    memset(ifCountMap, 0, sizeof(ifCountMap));
+    for (int i = 0; i < ifname_count; i++) {
+        int real_idx = mapIfIndex[i];
+        if (real_idx == -1) {
+            continue;
+        } else if (real_idx == i) {
+            int ip_index = ifCountMap[real_idx];
+            (*ifs)[real_idx].ip = (ip_address *)malloc((*ifs)[real_idx].ip_count * sizeof(ip_address));
+            (*ifs)[real_idx].ip[ip_index] = ip_list[i];
+            ifCountMap[real_idx] += 1;
+        } else {
+            int ip_index = ifCountMap[real_idx];
+            (*ifs)[real_idx].ip[ip_index] = ip_list[i];
+            ifCountMap[real_idx] += 1;
+        }
+    }
+
+    free(ifname_list);
+    free(ip_list);
+    free(mac_list);
+    *count = real_count;
+
 #endif
 
     return ZZMSG_RET_OK;
@@ -421,11 +519,29 @@ udp_address addrconv_unix2zz(struct sockaddr_in addr) {
     return zzaddr;
 }
 
+mac_address macconv_unix2zz(struct sockaddr_ll *addr) {
+    mac_address zzmac;
+    for (int i = 0; i < addr->sll_halen; ++i) {
+        zzmac.addr[i] = addr->sll_addr[i];
+    }
+    return zzmac;
+}
+
+ip_address ipconv_unix2zz(struct sockaddr_in *addr) {
+    u32 ip = addr->sin_addr.s_addr;
+    ip_address zzip;
+    zzip.a = ip;
+    zzip.b = ip >> 8;
+    zzip.c = ip >> 16;
+    zzip.d = ip >> 24;
+    return zzip;
+}
+
 #endif
 
 ip_address addrconv_str2ip(char *str) {
     ip_address ip;
-    sscanf(str, "%d.%d.%d.%d", &ip.a, &ip.b, &ip.c, &ip.d);
+    sscanf(str, "%u.%u.%u.%u", &ip.a, &ip.b, &ip.c, &ip.d);
     return ip;
 }
 
@@ -482,7 +598,7 @@ int set_socket_if(udp_socket sock, ip_address ip) {
 
 #ifdef _UNIX
     int *psock = (int *)sock.sock_ptr;
-    in_addr_t addr = ipconv_zz2unix(ip->a, ip->b, ip->c, ip->d);
+    in_addr_t addr = ipconv_zz2unix(ip.a, ip.b, ip.c, ip.d);
     ret = setsockopt(*(int *)(sock.sock_ptr), IPPROTO_IP, IP_MULTICAST_IF, (const char *)&addr, sizeof(addr));
     if (ret) {
         printf("setsockopt(if) failed, code %d\n", ret);
