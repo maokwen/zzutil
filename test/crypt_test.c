@@ -23,7 +23,8 @@ void test_sm4_ecb(zzcrypt_devhandle_p hdev) {
     ret = zzcrypt_sm4_import_key(hdev, key, &hkey);
     assert(ret == ZZECODE_OK);
 
-    block_cipherp_param_t param;
+    zzcrypt_cipherp_param_t param;
+    param.algorithm = zzcrypt_algorithm_sm4ecb;
     param.iv = NULL;
     param.iv_len = 0;
     param.padding_type = zzcrypt_padding_none;
@@ -78,7 +79,8 @@ void test_sm4_ecb_padding(zzcrypt_devhandle_p hdev) {
     ret = zzcrypt_sm4_import_key(hdev, key, &hkey);
     assert(ret == ZZECODE_OK);
 
-    block_cipherp_param_t param;
+    zzcrypt_cipherp_param_t param;
+    param.algorithm = zzcrypt_algorithm_sm4ecb;
     param.iv = NULL;
     param.iv_len = 0;
     param.padding_type = zzcrypt_padding_pkcs7;

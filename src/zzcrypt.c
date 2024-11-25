@@ -15,7 +15,7 @@
 
 typedef struct _zzcrypt_devhandle dev_t;
 typedef struct _zzcrypt_keyhandle key_t;
-typedef struct _block_cipherp_param cparam_t;
+typedef struct _zzcrypt_cipherp_param cparam_t;
 typedef HANDLE skf_handle_t;
 
 static PSKF_FUNCLIST FunctionList;
