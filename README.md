@@ -8,7 +8,7 @@
 
 要能够以统一的形式收发 UDP 包。
 
-参见头文件：[zzmessage.h](zzutil/include/zzutil/zzmessage.h)。
+参见头文件：[zzmessage.h](include/zzutil/zzmessage.h)。
 
 ### 数据包缓存
 
@@ -30,31 +30,14 @@
 3. 存储数据的时间戳，以便清理过时数据
 4. 以键值对的形式存储到队列数据的索引，以便查询
 
-参见头文件：[zzcache.h](zzutil/include/zzutil/zzcache.h)。
+参见头文件：[zzcache.h](include/zzutil/zzcache.h)。
 
-## 示例程序
+### Skf 加密解密封装
 
-在 `example` 目录下。
+对 Skf 的加密解密接口进行封装，方面使用。
 
-### Build
+-[x] SM2 加密解密
+-[x] SM4 加密解密
+-[ ] 验证: 指纹, Pin 码
 
-You need to have `cmake` and `mingw` installed.
-
-#### VS Code:
-
-`Ctrl+Shift+B` to build.
-
-`F5` to run.
-
-see `build` directory for output.
-
-#### Command line:
-
-```cmd
-mkdir cmake_build
-cd cmake_build
-cmake .. -G "MinGW Makefiles"
-mingw32-make .
-```
-
-see `build` directory for output.
+参见头文件：[zzcrypt.h](include/zzutil/zzcrypt.h)。
