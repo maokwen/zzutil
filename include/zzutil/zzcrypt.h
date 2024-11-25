@@ -54,15 +54,25 @@ typedef struct _zzcrypt_cipherp_param {
 /// @return 错误代码, 0 表示成功
 int zzcrypt_init(zzcrypt_devhandle_t **hdev, FILE *log);
 
+/// @brief SM2 加密
+/// @param[in] hdev 设备句柄
+/// @param[in] pubkey 公钥串(二进制表示)
+/// @param[in] data 待加密数据
+/// @param[in] len 待加密数据长度
+/// @param[out] enc_data 加密数据
+/// @param[out] enc_len 加密数据长度
+/// @return 错误代码, 0 表示成功
 int zzcrypt_sm2_encrypt(const zzcrypt_devhandle_t *hdev, const uint8_t *pubkey, const uint8_t *data, size_t len, uint8_t **enc_data, size_t *enc_len);
 
-int zzcrypt_sm2_import_key(const zzcrypt_devhandle_t *hdev, const uint8_t *prikey, const uint8_t *pubkey, zzcrypt_keyhandle_t **hkey);
-
+/// @brief SM2 解密
+/// @param[in] hdev 设备句柄
+/// @param[in] prikey 私钥串(二进制表示)
+/// @param[in] enc_data 待解密数据
+/// @param[in] enc_len 待解密数据长度
+/// @param[out] data 解密数据
+/// @param[out] len 解密数据长度
+/// @return 错误代码, 0 表示成功
 int zzcrypt_sm2_decrypt(const zzcrypt_devhandle_t *hdev, const uint8_t *prikey, const uint8_t *enc_data, size_t enc_len, uint8_t **data, size_t *len);
-
-int zzcrypt_sm2_sign(const zzcrypt_devhandle_t *hdev, const uint8_t *prikey, const uint8_t *data, size_t len, uint8_t **sign, size_t *sign_len);
-
-int zzcrypt_sm2_verify(const zzcrypt_devhandle_t *hdev, const uint8_t *pubkey, const uint8_t *data, size_t len, const uint8_t *sign, size_t sign_len);
 
 /// @brief 导入密钥
 /// @param[in] hdev 设备句柄

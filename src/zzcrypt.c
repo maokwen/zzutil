@@ -23,11 +23,12 @@ static bool is_initialized = false;
 static const u32 DEVICE_LOCK_TIMEOUT = 5000;
 static FILE *log_output = NULL;
 
-bool load_library();
-size_t sizeof_encoded_data(size_t cipher_len);
-int print_device_info(skf_handle_t hdev);
-bool skf_error(const char *msg, int ret);
-BLOCKCIPHERPARAM gen_block_cipher_param(const cparam_t *param);
+static bool load_library();
+static size_t sizeof_encoded_data(size_t cipher_len);
+static void print_device_info(skf_handle_t hdev);
+static bool skf_error(const char *msg, int ret);
+static BLOCKCIPHERPARAM gen_block_cipher_param(const cparam_t *param);
+static bool read_key_from_hex_string(const char *str, u8 **key, size_t *key_len);
 
 /************************************************************
  * Public functions
@@ -81,10 +82,7 @@ int zzcrypt_init(dev_t **hdev, FILE *log) {
     }
 
     /* get ukey DevAuthAlgId */ DISABLE {
-        ret = print_device_info((*hdev)->skf_handle);
-        if (skf_error) {
-            return ZZECODE_SKF_ERR;
-        }
+        print_device_info((*hdev)->skf_handle);
     }
 
     /* enmu all app */
@@ -111,6 +109,7 @@ int zzcrypt_sm2_encrypt(const dev_t *hdev, const uint8_t *pubkey, const uint8_t 
     int ret;
 
     PECCPUBLICKEYBLOB p_pubkey = malloc(sizeof(ECCPUBLICKEYBLOB));
+    memset(p_pubkey, 0, sizeof(ECCPUBLICKEYBLOB));
     p_pubkey->BitLen = 256;
     memcpy(p_pubkey->XCoordinate + 32, pubkey, 32);
     memcpy(p_pubkey->YCoordinate + 32, pubkey + 32, 32);
@@ -124,7 +123,7 @@ int zzcrypt_sm2_encrypt(const dev_t *hdev, const uint8_t *pubkey, const uint8_t 
     size_t real_len = sizeof_encoded_data((size_t)(p_res->CipherLen));
     *enc_len = real_len;
     *enc_data = malloc(real_len * sizeof(u8));
-    memcpy(*enc_data, p_res->Cipher, real_len * sizeof(u8));
+    memcpy(*enc_data, p_res, real_len * sizeof(u8));
 
     return ZZECODE_OK;
 }
@@ -133,22 +132,24 @@ int zzcrypt_sm2_decrypt(const dev_t *hdev, const uint8_t *prikey, const uint8_t 
     int ret;
 
     PECCPRIVATEKEYBLOB p_prikey = malloc(sizeof(ECCPRIVATEKEYBLOB));
+    memset(p_prikey, 0, sizeof(ECCPRIVATEKEYBLOB));
     p_prikey->BitLen = 256;
     memcpy(p_prikey->PrivateKey + 32, prikey, 32);
 
     PECCCIPHERBLOB p_enc_data = (PECCCIPHERBLOB)malloc(sizeof(ECCCIPHERBLOB) + enc_len * sizeof(u8) - sizeof(u8 *));
     p_enc_data->CipherLen = (u32)enc_len;
-    memcpy(p_enc_data->Cipher, enc_data, enc_len * sizeof(u8));
+    memcpy(p_enc_data, enc_data, enc_len * sizeof(u8));
 
-    data = malloc(enc_len * sizeof(u8)); // typically, the decrypted data is not longer than the encrypted data
-
+    u8 *buf = malloc(enc_len * sizeof(u8)); // typically, the decrypted data is not longer than the encrypted data
     u32 de_len = (u32)enc_len;
-    ret = FunctionList->SKF_ExtECCDecrypt(hdev->skf_handle, p_prikey, p_enc_data, (u8 *)data, &de_len);
+    ret = FunctionList->SKF_ExtECCDecrypt(hdev->skf_handle, p_prikey, p_enc_data, buf, &de_len);
     if (skf_error("SKF_ExtECCDecrypt", ret)) {
         return ZZECODE_SKF_ERR;
     }
 
     *len = de_len;
+    *data = malloc(de_len * sizeof(u8));
+    memcpy(*data, buf, de_len * sizeof(u8));
 
     return ZZECODE_OK;
 }
@@ -442,7 +443,7 @@ size_t sizeof_encoded_data(size_t cipher_len) {
     return sizeof(ECCCIPHERBLOB) - 1 + cipher_len;
 }
 
-int print_device_info(skf_handle_t hdev) {
+void print_device_info(skf_handle_t hdev) {
     int ret = 0;
     DEVINFO info;
 
@@ -450,14 +451,13 @@ int print_device_info(skf_handle_t hdev) {
     ret = FunctionList->SKF_GetDevInfo(hdev, &info);
     if (ret) {
         fprintf(log_output, "SKF_GetDevInfo() failed: %#x\n", ret);
-        return ret;
+        return;
     }
 
     fprintf(log_output, "SerialNumber: %s\n", info.SerialNumber);
     fprintf(log_output, "DevAuthAlgId: 0x%x\n", info.DevAuthAlgId);
     fprintf(log_output, "TotalSpace: %d\n", info.TotalSpace);
     fprintf(log_output, "FreeSpace: %d\n", info.FreeSpace);
-    return ret;
 }
 
 bool skf_error(const char *msg, int ret) {
@@ -502,4 +502,8 @@ BLOCKCIPHERPARAM gen_block_cipher_param(const cparam_t *param) {
     }
 
     return p;
+}
+
+bool read_key_from_hex_string(const char *str, u8 **key, size_t *key_len) {
+    zzhex_hex_to_bin(str, key, key_len);
 }

@@ -1,13 +1,25 @@
 #include <zzutil/basetype.h>
 #include <zzutil/zzhex.h>
+#include <zzutil/errmsg.h>
 
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 
 static const char base64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static const char hex_table[] = "0123456789abcdef";
 
-void zzhex_base64_encode(char *hex, size_t len, char **base64) {
+/************************************************************
+ * Declears
+ ************************************************************/
+
+static void to_lower_case(char *str);
+
+/************************************************************
+ * Public functions
+ ************************************************************/
+
+int zzhex_base64_encode(char *hex, size_t len, char **base64) {
     u8 *hex_data = (u8 *)hex;
     u8 *base64_data = (u8 *)malloc(len / 3 * 4 + 4);
     int i = 0;
@@ -37,15 +49,15 @@ void zzhex_base64_encode(char *hex, size_t len, char **base64) {
 
     *base64 = (char *)base64_data;
 
-    return;
+    return ZZECODE_OK;
 }
 
-void zzhex_base64_decode(const char *base64, unsigned char **data, size_t *len) {
+int zzhex_base64_decode(const char *base64, unsigned char **data, size_t *len) {
     size_t base64_len = strlen(base64);
     if (base64_len % 4 != 0) {
         *data = NULL;
         *len = 0;
-        return;
+        return ZZECODE_PARAM_ERR;
     }
 
     size_t padding = 0;
@@ -71,22 +83,77 @@ void zzhex_base64_decode(const char *base64, unsigned char **data, size_t *len) 
         if (base64[i + 3] != '=')
             *p++ = n & 0xFF;
     }
+
+    return ZZECODE_OK;
 }
 
-void zzhex_print_data_hex(char *info, unsigned char *data, size_t len) {
-    if (info)
+int zzhex_print_data_hex(char *info, unsigned char *data, size_t len) {
+    if (info) {
         printf("%s\n", info);
-
+    }
     for (unsigned i = 0; i < len; i++) {
         if (i && i % 16 == 0)
             printf("\n");
         printf("%02x", data[i]);
     }
     printf("\n");
+
+    return ZZECODE_OK;
 }
 
-void zzhex_print_data_base64(char *info, unsigned char *data, size_t len) {
+int zzhex_print_data_base64(char *info, unsigned char *data, size_t len) {
     char *res;
     zzhex_base64_encode((char *)data, len, &res);
     printf("%s: %s\n", info, res);
+
+    return ZZECODE_OK;
+}
+
+int zzhex_hex_to_bin(const char *hex, unsigned char **data, size_t *len) {
+    size_t hex_len = strlen(hex);
+    if (hex_len % 2 != 0) {
+        *data = NULL;
+        *len = 0;
+        return ZZECODE_PARAM_ERR;
+    }
+
+    char *s = (char *)malloc(hex_len + 1);
+    strcpy(s, hex);
+    to_lower_case(s);
+
+    *len = hex_len / 2;
+    *data = (u8 *)malloc(*len);
+
+    for (size_t i = 0; i < hex_len; i += 2) {
+        (*data)[i / 2] = (u8)(
+            (strchr(hex_table, s[i]) - hex_table) << 4 |
+            (strchr(hex_table, s[i + 1]) - hex_table)
+        );
+    }
+
+    return ZZECODE_OK;
+}
+
+int zzhex_bin_to_hex(const unsigned char *data, size_t len, char **hex) {
+    *hex = (char *)malloc(len * 2 + 1);
+    for (size_t i = 0; i < len; i++) {
+        (*hex)[i * 2] = hex_table[data[i] >> 4];
+        (*hex)[i * 2 + 1] = hex_table[data[i] & 0x0f];
+    }
+    (*hex)[len * 2] = 0;
+
+    return ZZECODE_OK;
+}
+
+/************************************************************
+ * Internal functions
+ ************************************************************/
+
+void to_lower_case(char *str) {
+    while (*str) {
+        if (*str >= 'A' && *str <= 'Z') {
+            *str += 32;
+        }
+        str++;
+    }
 }
