@@ -27,6 +27,7 @@ bool load_library();
 size_t sizeof_encoded_data(size_t cipher_len);
 int print_device_info(skf_handle_t hdev);
 bool skf_error(const char *msg, int ret);
+BLOCKCIPHERPARAM gen_block_cipher_param(const cparam_t *param);
 
 /************************************************************
  * Public functions
@@ -173,31 +174,7 @@ int zzcrypt_sm4_encrypt_init(key_t *hkey, cparam_t param) {
         return ZZECODE_OK;
     }
 
-    BLOCKCIPHERPARAM p;
-    memset(&p, 0, sizeof(BLOCKCIPHERPARAM));
-
-    if (param.iv_len > 0) {
-        memcpy(p.IV, param.iv, param.iv_len * sizeof(u8));
-        p.IVLen = (u32)param.iv_len;
-    } else {
-        p.IVLen = 0;
-    }
-    
-    switch (param.padding_type) {
-        case zzcrypt_padding_pkcs7:
-            // use padding implementation of skf library
-            p.PaddingType = 1;
-            break;
-        case zzcrypt_padding_pkcs5:
-            // use padding implementation of our own
-            p.PaddingType = 0;
-            break;
-        case zzcrypt_padding_none:
-        default:
-            p.PaddingType = 0;
-            break;
-    }
-
+    BLOCKCIPHERPARAM p = gen_block_cipher_param(&param);
     ret = FunctionList->SKF_EncryptInit(hkey->skf_handle, p);
     if (skf_error("SKF_EncryptInit", ret)) {
         return ZZECODE_SKF_ERR;
@@ -302,31 +279,7 @@ int zzcrypt_sm4_decrypt_init(key_t *hkey, cparam_t param) {
         return ZZECODE_OK;
     }
 
-    BLOCKCIPHERPARAM p;
-    memset(&p, 0, sizeof(BLOCKCIPHERPARAM));
-
-    if (param.iv_len > 0) {
-        memcpy(p.IV, param.iv, param.iv_len * sizeof(u8));
-        p.IVLen = (u32)param.iv_len;
-    } else {
-        p.IVLen = 16;
-    }
-    
-    switch (param.padding_type) {
-        case zzcrypt_padding_pkcs7:
-            // use padding implementation of skf library
-            p.PaddingType = 1;
-            break;
-        case zzcrypt_padding_pkcs5:
-            // use padding implementation of our own
-            p.PaddingType = 0;
-            break;
-        case zzcrypt_padding_none:
-        default:
-            p.PaddingType = 0;
-            break;
-    }
-
+    BLOCKCIPHERPARAM p = gen_block_cipher_param(&param);
     ret = FunctionList->SKF_DecryptInit(hkey->skf_handle, p);
     if (skf_error("SKF_DecryptInit", ret)) {
         return ZZECODE_SKF_ERR;
@@ -516,4 +469,37 @@ bool skf_error(const char *msg, int ret) {
         }
         return true;
     }
+}
+
+BLOCKCIPHERPARAM gen_block_cipher_param(const cparam_t *param) {
+    BLOCKCIPHERPARAM p;
+    memset(&p, 0, sizeof(BLOCKCIPHERPARAM));
+
+    if (param->iv_len > 0) {
+        memcpy(p.IV, param->iv, param->iv_len * sizeof(u8));
+        p.IVLen = (u32)param->iv_len;
+    } else {
+        p.IVLen = 0;
+    }
+    
+    switch (param->padding_type) {
+        case zzcrypt_padding_pkcs5:
+            // use padding implementation of skf library
+            p.PaddingType = PKCS5_PADDING;
+            break;
+        case zzcrypt_padding_zero:
+            // use padding implementation of skf library
+            p.PaddingType = ZERO_PADDING;
+            break;
+        case zzcrypt_padding_pkcs7:
+            // use padding implementation of our own
+            p.PaddingType = 0;
+            break;
+        case zzcrypt_padding_none:
+        default:
+            p.PaddingType = 0;
+            break;
+    }
+
+    return p;
 }

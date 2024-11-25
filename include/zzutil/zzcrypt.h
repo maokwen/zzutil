@@ -11,8 +11,9 @@ typedef struct _zzcrypt_keyhandle zzcrypt_keyhandle_t, *zzcrypt_keyhandle_p;
 
 typedef enum _zzcrypt_padding_t {
     zzcrypt_padding_none = 0,
-    zzcrypt_padding_pkcs5 = 5, // NOTE: not implemented
-    zzcrypt_padding_pkcs7 = 7,
+    zzcrypt_padding_zero = 1,
+    zzcrypt_padding_pkcs5 = 5,
+    zzcrypt_padding_pkcs7 = 7, // NOTE: not implemented
 } zzcrypt_padding_t;
 
 typedef enum _zzcrypt_algorithm_t {
