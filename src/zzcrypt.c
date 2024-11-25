@@ -59,7 +59,7 @@ int zzcrypt_init(dev_t **hdev, FILE *log) {
     if (is_initialized) {
         return ZZECODE_DEV_ALREADY_INIT;
     }
-    
+
     if (!load_library() && log_output) {
         fprintf(log_output, "Load library failed\n");
         return ZZECODE_OS_ERROR;
@@ -104,7 +104,6 @@ int zzcrypt_init(dev_t **hdev, FILE *log) {
     (*hdev)->is_initialized = true;
     is_initialized = true;
 
-    
     return ZZECODE_OK;
 }
 
@@ -117,7 +116,7 @@ int zzcrypt_sm2_encrypt(const dev_t *hdev, const uint8_t *pubkey, const uint8_t 
     memcpy(p_pubkey->YCoordinate + 32, pubkey + 32, 32);
 
     PECCCIPHERBLOB p_res = (PECCCIPHERBLOB)malloc(sizeof(ECCCIPHERBLOB));
-    ret = FunctionList->SKF_ExtECCEncrypt(hdev->skf_handle, p_pubkey, (u8*)data, (u32)len, p_res);
+    ret = FunctionList->SKF_ExtECCEncrypt(hdev->skf_handle, p_pubkey, (u8 *)data, (u32)len, p_res);
     if (skf_error("SKF_ExtECCEncrypt", ret)) {
         return ZZECODE_SKF_ERR;
     }
@@ -137,14 +136,14 @@ int zzcrypt_sm2_decrypt(const dev_t *hdev, const uint8_t *prikey, const uint8_t 
     p_prikey->BitLen = 256;
     memcpy(p_prikey->PrivateKey + 32, prikey, 32);
 
-    PECCCIPHERBLOB p_enc_data = (PECCCIPHERBLOB)malloc(sizeof(ECCCIPHERBLOB) + enc_len * sizeof(u8) - sizeof(u8*));
+    PECCCIPHERBLOB p_enc_data = (PECCCIPHERBLOB)malloc(sizeof(ECCCIPHERBLOB) + enc_len * sizeof(u8) - sizeof(u8 *));
     p_enc_data->CipherLen = (u32)enc_len;
     memcpy(p_enc_data->Cipher, enc_data, enc_len * sizeof(u8));
 
     data = malloc(enc_len * sizeof(u8)); // typically, the decrypted data is not longer than the encrypted data
 
     u32 de_len = (u32)enc_len;
-    ret = FunctionList->SKF_ExtECCDecrypt(hdev->skf_handle, p_prikey, p_enc_data, (u8*)data, &de_len);
+    ret = FunctionList->SKF_ExtECCDecrypt(hdev->skf_handle, p_prikey, p_enc_data, (u8 *)data, &de_len);
     if (skf_error("SKF_ExtECCDecrypt", ret)) {
         return ZZECODE_SKF_ERR;
     }
@@ -159,7 +158,7 @@ int zzcrypt_sm4_import_key(const dev_t *hdev, const uint8_t *key, key_t **hkey) 
 
     *hkey = malloc(sizeof(key_t));
     (*hkey)->is_initialized = false;
-    ret = FunctionList->SKF_SetSymmKey(hdev->skf_handle, (u8*)key, SGD_SMS4_ECB, &((*hkey)->skf_handle));
+    ret = FunctionList->SKF_SetSymmKey(hdev->skf_handle, (u8 *)key, SGD_SMS4_ECB, &((*hkey)->skf_handle));
     if (skf_error("SKF_SetSymmKey", ret)) {
         return ZZECODE_SKF_ERR;
     }
@@ -202,14 +201,15 @@ int zzcrypt_sm4_encrypt_push(key_t *hkey, const uint8_t *data, size_t len) {
     DISABLE {
         // NOTE: didn't fucking work (for impl of current skf library)
         //       use the code blow will break the crpyto process - for no reason.
-        ret = FunctionList->SKF_EncryptUpdate(hkey->skf_handle, (u8*)data, (u32)len, NULL, &new_len);
+        ret = FunctionList->SKF_EncryptUpdate(hkey->skf_handle, (u8 *)data, (u32)len, NULL, &new_len);
         if (skf_error("SKF_EncryptUpdate", ret)) {
             return ZZECODE_SKF_ERR;
         }
         if (new_len == 0) {
             new_len = (u32)len;
         }
-    } else {
+    }
+    else {
         // assume that the length of encrypted data is less than twice of the original data
         // that means new_len is not greater than len*2
         new_len = (u32)len * 2;
@@ -226,7 +226,7 @@ int zzcrypt_sm4_encrypt_push(key_t *hkey, const uint8_t *data, size_t len) {
     // push data to buffer
     // u32 left = hkey->buf_len - hkey->data_len;
     new_len = 0;
-    ret = FunctionList->SKF_EncryptUpdate(hkey->skf_handle, (u8*)data, (u32)len, hkey->data_ptr, &new_len);
+    ret = FunctionList->SKF_EncryptUpdate(hkey->skf_handle, (u8 *)data, (u32)len, hkey->data_ptr, &new_len);
     if (skf_error("SKF_EncryptUpdate", ret)) {
         return ZZECODE_SKF_ERR;
     }
@@ -301,21 +301,21 @@ int zzcrypt_sm4_decrypt_push(key_t *hkey, const uint8_t *data, size_t len) {
     if (!hkey->is_initialized) {
         return ZZECODE_CRYPO_NO_INIT;
     }
-    
 
     // check upcomming length of data
     u32 new_len = 0;
     DISABLE {
         // NOTE: didn't fucking work (for impl of current skf library)
         //       use the code blow will break the crpyto process - for no reason.
-        ret = FunctionList->SKF_DecryptUpdate(hkey->skf_handle, (u8*)data, (u32)len, NULL, &new_len);
+        ret = FunctionList->SKF_DecryptUpdate(hkey->skf_handle, (u8 *)data, (u32)len, NULL, &new_len);
         if (skf_error("SKF_DecryptUpdate", ret)) {
             return ZZECODE_SKF_ERR;
         }
         if (new_len == 0) {
             new_len = (u32)len;
         }
-    } else {
+    }
+    else {
         // assume that the length of decrypted data is less than or equal to the length of encrypted data
         // that means new_len is not greater than len
         new_len = (u32)len;
@@ -331,7 +331,7 @@ int zzcrypt_sm4_decrypt_push(key_t *hkey, const uint8_t *data, size_t len) {
 
     // push data to buffer
     new_len = 0;
-    ret = FunctionList->SKF_DecryptUpdate(hkey->skf_handle, (u8*)data, (u32)len, hkey->data_ptr, &new_len);
+    ret = FunctionList->SKF_DecryptUpdate(hkey->skf_handle, (u8 *)data, (u32)len, hkey->data_ptr, &new_len);
     if (skf_error("SKF_DecryptUpdate", ret)) {
         return ZZECODE_SKF_ERR;
     }
@@ -481,24 +481,24 @@ BLOCKCIPHERPARAM gen_block_cipher_param(const cparam_t *param) {
     } else {
         p.IVLen = 0;
     }
-    
+
     switch (param->padding_type) {
-        case zzcrypt_padding_pkcs5:
-            // use padding implementation of skf library
-            p.PaddingType = PKCS5_PADDING;
-            break;
-        case zzcrypt_padding_zero:
-            // use padding implementation of skf library
-            p.PaddingType = ZERO_PADDING;
-            break;
-        case zzcrypt_padding_pkcs7:
-            // use padding implementation of our own
-            p.PaddingType = 0;
-            break;
-        case zzcrypt_padding_none:
-        default:
-            p.PaddingType = 0;
-            break;
+    case zzcrypt_padding_pkcs5:
+        // use padding implementation of skf library
+        p.PaddingType = PKCS5_PADDING;
+        break;
+    case zzcrypt_padding_zero:
+        // use padding implementation of skf library
+        p.PaddingType = ZERO_PADDING;
+        break;
+    case zzcrypt_padding_pkcs7:
+        // use padding implementation of our own
+        p.PaddingType = 0;
+        break;
+    case zzcrypt_padding_none:
+    default:
+        p.PaddingType = 0;
+        break;
     }
 
     return p;
