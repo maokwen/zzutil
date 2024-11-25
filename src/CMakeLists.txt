@@ -18,8 +18,6 @@ SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_LIST_DIR}/build")
 if(WIN32)
     add_definitions(-D_WIN32)
     add_definitions(-D_WIN32_WINNT=0x0600) # Windows Vista and up
-    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-    add_definitions(-D_CRT_NONSTDC_NO_DEPRECATE)
     if(MINGW)
         add_definitions(-D_MINGW)
     endif(MINGW)
@@ -37,18 +35,6 @@ endif(UNIX)
 #     endif()
 # endif()
 
-#####
-# common
-
-add_library(zzcommon STATIC
-    src/common/helper.c
-)
-
-target_include_directories(zzcommon
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
-)
 
 #####
 # hex
@@ -71,8 +57,6 @@ target_include_directories(zzhex
         $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(zzhex zzcommon)
-
 #####
 # crypt
 
@@ -93,10 +77,11 @@ target_include_directories(zzcrypt
         $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(zzcrypt usbkey zzhex zzcommon)
+target_link_libraries(zzcrypt usbkey zzhex)
 
 add_library(zzmessage SHARED
-    src/zzmessage.c
+    message/zzmessage.c
+    util/basetype.c
 )
 
 target_include_directories(zzmessage PUBLIC
@@ -108,10 +93,11 @@ if(WIN32)
     set(ZZMESSAGE_ADDITIONAL_LIBS wsock32 ws2_32 iphlpapi)
 endif(WIN32)
 
-target_link_libraries(zzmessage zzcommon ${ZZMESSAGE_ADDITIONAL_LIBS}) 
+target_link_libraries(zzmessage ${ZZMESSAGE_ADDITIONAL_LIBS}) 
 
 add_library(zzcache SHARED
-    src/zzcache.c
+    cache/zzcache.c
+    util/basetype.c
 )
 
 target_include_directories(zzcache PUBLIC
@@ -123,7 +109,7 @@ if(UNIX)
     set(ZZCACHE_ADDITIONAL_LIBS pthread)
 endif(UNIX)
 
-target_link_libraries(zzcache zzcommon ${ZZCACHE_ADDITIONAL_LIBS})
+target_link_libraries(zzcache ${ZZCACHE_ADDITIONAL_LIBS})
 
 add_library(zzutil::zzmessage ALIAS zzmessage)
 add_library(zzutil::zzcache ALIAS zzcache)
@@ -136,7 +122,7 @@ add_subdirectory(test)
 #####
 # Install
 
-install(TARGETS zzcommon zzhex zzcrypt zzmessage zzcache
+install(TARGETS zzhex zzcrypt zzmessage zzcache
     EXPORT zzutil-targets
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
@@ -172,3 +158,4 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/cmake/zzutil-config-version.cmake
     DESTINATION lib/cmake/zzutil
 )
+

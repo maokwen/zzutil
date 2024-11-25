@@ -57,8 +57,8 @@ int main(int agrc, char *agrv[]) {
 
     // send udp messageP
     while (1) {
-        char str[] = "Hello, World!";
-        ret = zzmsg_send_udp(socket, addr, str, strlen(str), &local_ip);
+        char str[] = "1,{\"ukey_mac\":\"44:A3:BB:55:8F:B6\",\"ukey_serialno\":\"4D3846353706382E\"}";
+        ret = zzmsg_send_udp(socket, addr, str, (u32)strlen(str), &local_ip);
         if (ret) {
             pasue_on_exit();
             return ret;

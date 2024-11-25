@@ -1,4 +1,5 @@
 #include "zzutil/zzmessage.h"
+#include "zzutil/errmsg.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,32 +52,30 @@ static int set_socket_if(udp_socket sock, ip_address ip);
 
 /* Init */
 int zzmsg_init() {
-    int ret;
 #ifdef _WIN32
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData)) {
         printf("WSAStartup() failed\n");
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
 #endif
     zzmsg_is_initilized = 1;
-    return ZZMSG_RET_OK;
+    return ZZECODE_OK;
 }
 
 /* Create socket */
 int zzmsg_create_socket(udp_socket *sock) {
-    int ret;
     if (check_init()) {
-        return ZZMSG_RET_NO_INIT;
+        return ZZECODE_NO_INIT;
     }
 
 #ifdef _WIN32
     // create socket
     sock->sock_ptr = malloc(sizeof(SOCKET));
     *(SOCKET *)(sock->sock_ptr) = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if ((int)sock->sock_ptr == INVALID_SOCKET) {
+    if (*(SOCKET*)(sock->sock_ptr) == INVALID_SOCKET) {
         printf("socket() failed\n");
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
     printf("socket() success\n");
 #endif
@@ -86,33 +85,33 @@ int zzmsg_create_socket(udp_socket *sock) {
     *psock = socket(AF_INET, SOCK_DGRAM, 0);
     if (*psock < 0) {
         printf("socket() failed\n");
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
     sock->sock_ptr = (void *)psock;
 #endif
 
-    return ZZMSG_RET_OK;
+    return ZZECODE_OK;
 }
 
 /* Bind socket */
 int zzmsg_bind_socket(udp_socket sock, u16 port, ip_address *local_ip) {
     int ret;
     if (check_init()) {
-        return ZZMSG_RET_NO_INIT;
+        return ZZECODE_NO_INIT;
     }
 
     if (local_ip) {
         ret = set_socket_if(sock, *local_ip);
         if (ret) {
             printf("bind() failed\n");
-            return ZZMSG_RET_SETSOCKET_FAILED;
+            return ZZECODE_SETSOCKET_FAILED;
         }
     }
 
     ret = set_socket_reusable(sock);
     if (ret) {
         printf("bind() failed\n");
-        return ZZMSG_RET_SETSOCKET_FAILED;
+        return ZZECODE_SETSOCKET_FAILED;
     }
 
 #ifdef _WIN32
@@ -125,7 +124,7 @@ int zzmsg_bind_socket(udp_socket sock, u16 port, ip_address *local_ip) {
     ret = bind(*(SOCKET *)(sock.sock_ptr), (SOCKADDR *)&addr, sizeof(SOCKADDR_IN));
     if (ret == SOCKET_ERROR) {
         printf("bind() failed, code %d\n", ret);
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
 #endif
 
@@ -139,19 +138,19 @@ int zzmsg_bind_socket(udp_socket sock, u16 port, ip_address *local_ip) {
     ret = bind(*(int *)(sock.sock_ptr), (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
     if (ret) {
         printf("bind() failed, code %d\n", ret);
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
 #endif
 
     printf("bind() success\n");
-    return ZZMSG_RET_OK;
+    return ZZECODE_OK;
 }
 
 /* join multicast group */
 int zzmsg_join_multicast_group(udp_socket sock, ip_address group) {
     int ret;
     if (check_init()) {
-        return ZZMSG_RET_NO_INIT;
+        return ZZECODE_NO_INIT;
     }
 
 #ifdef _WIN32
@@ -161,7 +160,7 @@ int zzmsg_join_multicast_group(udp_socket sock, ip_address group) {
     ret = setsockopt(*(SOCKET *)(sock.sock_ptr), IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&mreq, sizeof(mreq));
     if (ret) {
         printf("setsockopt() failed, code %d\n", ret);
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
 #endif
 
@@ -172,26 +171,26 @@ int zzmsg_join_multicast_group(udp_socket sock, ip_address group) {
     ret = setsockopt(*(int *)(sock.sock_ptr), IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&mreq, sizeof(mreq));
     if (ret) {
         printf("setsockopt() failed, code %d\n", ret);
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
 #endif
 
     printf("join multicast group success\n");
-    return ZZMSG_RET_OK;
+    return ZZECODE_OK;
 }
 
 /* Send udp message */
 int zzmsg_send_udp(udp_socket sock, udp_address addr, u8 *data, u32 len, ip_address *local_ip) {
     int ret;
     if (check_init()) {
-        return ZZMSG_RET_NO_INIT;
+        return ZZECODE_NO_INIT;
     }
 
     if (local_ip) {
         ret = set_socket_if(sock, *local_ip);
         if (ret) {
             printf("send_udp() failed\n");
-            return ZZMSG_RET_SETSOCKET_FAILED;
+            return ZZECODE_SETSOCKET_FAILED;
         }
     }
 
@@ -200,7 +199,7 @@ int zzmsg_send_udp(udp_socket sock, udp_address addr, u8 *data, u32 len, ip_addr
     ret = sendto(*(SOCKET *)(sock.sock_ptr), data, len, 0, (SOCKADDR *)&dest, sizeof(SOCKADDR_IN));
     if (ret == 0) {
         printf("sendto() failed\n");
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
 #endif
 
@@ -209,18 +208,17 @@ int zzmsg_send_udp(udp_socket sock, udp_address addr, u8 *data, u32 len, ip_addr
     ret = sendto(*(int *)(sock.sock_ptr), data, len, 0, (struct sockaddr *)&dest, sizeof(struct sockaddr_in));
     if (ret == 0) {
         printf("sendto() failed\n");
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
 #endif
 
-    return ZZMSG_RET_OK;
+    return ZZECODE_OK;
 }
 
 /* Receive udp message */
 int zzmsg_recv_udp(udp_socket sock, udp_address *addr, u8 *buf, u32 len, u32 *receive_len) {
-    int ret;
     if (check_init()) {
-        return ZZMSG_RET_NO_INIT;
+        return ZZECODE_NO_INIT;
     }
 
 #ifdef _WIN32
@@ -230,11 +228,11 @@ int zzmsg_recv_udp(udp_socket sock, udp_address *addr, u8 *buf, u32 len, u32 *re
     int bytes_received = recvfrom(*(SOCKET *)(sock.sock_ptr), buf, len - 1, 0, (SOCKADDR *)&from, &from_len);
     if (bytes_received <= 0) {
         printf("recvfrom() failed\n");
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
     if (bytes_received == len - 1) {
         printf("buffer is too small\n");
-        return ZZMSG_RET_BUFFER_TOO_SMALL;
+        return ZZECODE_BUFFER_TOO_SMALL;
     }
 
     buf[bytes_received] = '\0';
@@ -248,11 +246,11 @@ int zzmsg_recv_udp(udp_socket sock, udp_address *addr, u8 *buf, u32 len, u32 *re
     int bytes_received = recvfrom(*(int *)(sock.sock_ptr), buf, len - 1, 0, (struct sockaddr *)&from, &from_len);
     if (bytes_received <= 0) {
         printf("recvfrom() failed\n");
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
     if (bytes_received == len - 1) {
         printf("buffer is too small\n");
-        return ZZMSG_RET_BUFFER_TOO_SMALL;
+        return ZZECODE_BUFFER_TOO_SMALL;
     }
 
     buf[bytes_received] = '\0';
@@ -260,12 +258,12 @@ int zzmsg_recv_udp(udp_socket sock, udp_address *addr, u8 *buf, u32 len, u32 *re
     *addr = addrconv_unix2zz(from);
 #endif
 
-    return ZZMSG_RET_OK;
+    return ZZECODE_OK;
 }
 
 int zzmsg_close_socket(udp_socket sock) {
     if (check_init()) {
-        return ZZMSG_RET_NO_INIT;
+        return ZZECODE_NO_INIT;
     }
 
 #ifdef _WIN32
@@ -278,13 +276,13 @@ int zzmsg_close_socket(udp_socket sock) {
     free(sock.sock_ptr);
 #endif
 
-    return ZZMSG_RET_OK;
+    return ZZECODE_OK;
 }
 
 /* Get all interfaces */
 int zzmsg_get_all_interfaces(adapter_info **ifs, u32 *count) {
     if (check_init()) {
-        return ZZMSG_RET_NO_INIT;
+        return ZZECODE_NO_INIT;
     }
 
 #ifdef _WIN32
@@ -304,7 +302,7 @@ int zzmsg_get_all_interfaces(adapter_info **ifs, u32 *count) {
     ret = GetAdaptersAddresses(family, flags, NULL, addresses, &size);
     if (ret != NO_ERROR) {
         printf("GetAdaptersAddresses() failed, code %d\n", ret);
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
 
     PIP_ADAPTER_ADDRESSES p = addresses;
@@ -359,7 +357,7 @@ int zzmsg_get_all_interfaces(adapter_info **ifs, u32 *count) {
     ret = getifaddrs(&ifaddr);
     if (ret) {
         printf("getifaddrs() failed\n");
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
 
     int found;
@@ -452,7 +450,7 @@ int zzmsg_get_all_interfaces(adapter_info **ifs, u32 *count) {
 
 #endif
 
-    return ZZMSG_RET_OK;
+    return ZZECODE_OK;
 }
 
 /* SECTION platform-specific functions */
@@ -551,7 +549,7 @@ ip_address ipconv_unix2zz(struct sockaddr_in *addr) {
 
 ip_address addrconv_str2ip(char *str) {
     ip_address ip;
-    sscanf(str, "%u.%u.%u.%u", &ip.a, &ip.b, &ip.c, &ip.d);
+    sscanf(str, "%hhu.%hhu.%hhu.%hhu", &ip.a, &ip.b, &ip.c, &ip.d);
     return ip;
 }
 
@@ -567,14 +565,14 @@ int check_init() {
 
 int set_socket_reusable(udp_socket sock) {
     if (check_init()) {
-        return ZZMSG_RET_NO_INIT;
+        return ZZECODE_NO_INIT;
     }
 #ifdef _WIN32
     int ret = 0;
     setsockopt(*(SOCKET *)(sock.sock_ptr), SOL_SOCKET, SO_REUSEADDR, (char *)&ret, sizeof(ret));
     if (ret) {
         printf("setsockopt(reusable) failed, code %d\n", ret);
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
 #endif
 
@@ -584,25 +582,25 @@ int set_socket_reusable(udp_socket sock) {
     setsockopt(*(int *)(sock.sock_ptr), SOL_SOCKET, SO_REUSEADDR, (char *)&ret, sizeof(ret));
     if (ret) {
         printf("setsockopt(reusable) failed, code %d\n", ret);
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
 #endif
 
     printf("setsockopt(reusable) success\n");
-    return ZZMSG_RET_OK;
+    return ZZECODE_OK;
 }
 
 int set_socket_if(udp_socket sock, ip_address ip) {
     int ret;
     if (check_init()) {
-        return ZZMSG_RET_NO_INIT;
+        return ZZECODE_NO_INIT;
     }
 #ifdef _WIN32
     IN_ADDR addr = ipconv_zz2win(ip.a, ip.b, ip.c, ip.d);
     ret = setsockopt(*(SOCKET *)(sock.sock_ptr), IPPROTO_IP, IP_MULTICAST_IF, (const char *)&addr, sizeof(addr));
     if (ret) {
         printf("setsockopt(if) failed, code %d\n", ret);
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
 #endif
 
@@ -612,10 +610,10 @@ int set_socket_if(udp_socket sock, ip_address ip) {
     ret = setsockopt(*(int *)(sock.sock_ptr), IPPROTO_IP, IP_MULTICAST_IF, (const char *)&addr, sizeof(addr));
     if (ret) {
         printf("setsockopt(if) failed, code %d\n", ret);
-        return ZZMSG_RET_OS_ERROR;
+        return ZZECODE_OS_ERROR;
     }
 #endif
 
     printf("setsockopt(if) success\n");
-    return ZZMSG_RET_OK;
+    return ZZECODE_OK;
 }
