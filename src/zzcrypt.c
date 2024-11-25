@@ -180,7 +180,7 @@ int zzcrypt_sm4_encrypt_init(key_t *hkey, cparam_t param) {
         memcpy(p.IV, param.iv, param.iv_len * sizeof(u8));
         p.IVLen = (u32)param.iv_len;
     } else {
-        p.IVLen = 16;
+        p.IVLen = 0;
     }
     
     switch (param.padding_type) {
@@ -222,13 +222,20 @@ int zzcrypt_sm4_encrypt_push(key_t *hkey, const uint8_t *data, size_t len) {
 
     // check upcomming length of data
     u32 new_len = 0;
-    ret = FunctionList->SKF_EncryptUpdate(hkey->skf_handle, (u8*)data, (u32)len, NULL, &new_len);
-    if (skf_error("SKF_EncryptUpdate", ret)) {
-        return ZZECODE_SKF_ERR;
-    }
-
-    if (new_len == 0) {
-        new_len = (u32)len;
+    DISABLE {
+        // NOTE: didn't fucking work (for impl of current skf library)
+        //       use the code blow will break the crpyto process - for no reason.
+        ret = FunctionList->SKF_EncryptUpdate(hkey->skf_handle, (u8*)data, (u32)len, NULL, &new_len);
+        if (skf_error("SKF_EncryptUpdate", ret)) {
+            return ZZECODE_SKF_ERR;
+        }
+        if (new_len == 0) {
+            new_len = (u32)len;
+        }
+    } else {
+        // assume that the length of encrypted data is less than twice of the original data
+        // that means new_len is not greater than len*2
+        new_len = (u32)len * 2;
     }
 
     // if buffer is not enough, realloc it
@@ -346,21 +353,25 @@ int zzcrypt_sm4_decrypt_push(key_t *hkey, const uint8_t *data, size_t len) {
     // check upcomming length of data
     u32 new_len = 0;
     DISABLE {
-        // FIXME: didn't fucking work
+        // NOTE: didn't fucking work (for impl of current skf library)
+        //       use the code blow will break the crpyto process - for no reason.
         ret = FunctionList->SKF_DecryptUpdate(hkey->skf_handle, (u8*)data, (u32)len, NULL, &new_len);
         if (skf_error("SKF_DecryptUpdate", ret)) {
             return ZZECODE_SKF_ERR;
         }
-
         if (new_len == 0) {
             new_len = (u32)len;
         }
+    } else {
+        // assume that the length of decrypted data is less than or equal to the length of encrypted data
+        // that means new_len is not greater than len
+        new_len = (u32)len;
+    }
 
-        // if buffer is not enough, realloc it
-        while (hkey->data_len + new_len > hkey->buf_len) {
-            hkey->buf_len *= 2;
-            hkey->buf = realloc(hkey->buf, hkey->buf_len);
-        }
+    // if buffer is not enough, realloc it
+    while (hkey->data_len + new_len > hkey->buf_len) {
+        hkey->buf_len *= 2;
+        hkey->buf = realloc(hkey->buf, hkey->buf_len);
     }
 
     // TODO: padding data if needed
