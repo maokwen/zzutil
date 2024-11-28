@@ -33,6 +33,7 @@ target_link_libraries(CacheTest zzutil::zzcache)
 # crypt
 
 add_executable(CryptTest
+    testutil.c
     crypt_test.c
 )
 

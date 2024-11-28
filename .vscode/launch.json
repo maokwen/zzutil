@@ -28,12 +28,12 @@
             "environment": [],
             "MIMode": "gdb",
             "windows": {
-                "program": "${workspaceFolder}/build/UdpSender.exe",
-                "miDebuggerPath": "C:\\Qt\\Qt5.9.9\\Tools\\mingw530_32\\bin\\gdb.exe",
+                "program": "${workspaceFolder}/build/CryptTest.exe",
+                "miDebuggerPath": "C:\\Qt\\Tools\\mingw530_32\\bin\\gdb.exe",
                 "externalConsole": true,
             },
             "linux": {
-                "program": "${workspaceFolder}/build/UdpSender",
+                "program": "${workspaceFolder}/build/CryptTest",
                 "miDebuggerPath": "/usr/bin/gdb",
                 "externalConsole": false,
             },

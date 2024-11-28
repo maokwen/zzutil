@@ -9,8 +9,12 @@
 
 struct _zzcrypt_devhandle;
 struct _zzcrypt_keyhandle;
+struct _zzcrypt_apphandle;
+struct _zzcrypt_ctnhandle;
 typedef struct _zzcrypt_devhandle zzcrypt_devhandle_t, *zzcrypt_devhandle_p;
 typedef struct _zzcrypt_keyhandle zzcrypt_keyhandle_t, *zzcrypt_keyhandle_p;
+typedef struct _zzcrypt_apphandle zzcrypt_apphandle_t, *zzcrypt_apphandle_p;
+typedef struct _zzcrypt_ctnhandle zzcrypt_ctnhandle_t, *zzcrypt_ctnhandle_p;
 
 /// @brief 加密时的对齐方式
 typedef enum _zzcrypt_padding_t {
@@ -53,6 +57,10 @@ typedef struct _zzcrypt_cipherp_param {
 /// @param[in] log 日志文件句柄
 /// @return 错误代码, 0 表示成功
 int zzcrypt_init(zzcrypt_devhandle_t **hdev, FILE *log);
+
+int zzcrypt_init_app(const zzcrypt_devhandle_t *hdev, const char *app_name, const char *pin, zzcrypt_apphandle_t **happ);
+
+int zzcrypt_sm2_import_key(const zzcrypt_devhandle_t *hdev, const zzcrypt_apphandle_t *happ, const uint8_t *prikey, const uint8_t *pubkey, zzcrypt_ctnhandle_t **hctn);
 
 /// @brief SM2 加密
 /// @param[in] hdev 设备句柄
@@ -134,5 +142,10 @@ int zzcrypt_sm4_decrypt_peek(const zzcrypt_keyhandle_t *hkey, uint8_t **enc_data
 /// @param[out] enc_data 解密数据
 /// @param[out] enc_len 解密数据长度
 int zzcrypt_sm4_decrypt_pop(zzcrypt_keyhandle_t *hkey, uint8_t **enc_data, size_t *enc_len);
+
+/// @brief 释放加密句柄, hkey 所指向资源将被为无效，需要重新初始化
+/// @param[in] hkey 加密句柄
+/// @return 错误代码, 0 表示成功
+int zzcrypt_sm4_release(zzcrypt_keyhandle_t *hkey);
 
 #endif // ZZUTIL_ZZCRYPT_H

@@ -136,6 +136,8 @@ add_subdirectory(test)
 #####
 # Install
 
+set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_LIST_DIR}/../ZZMaintenanceTool/lib/zzutil)
+
 install(TARGETS zzcommon zzhex zzcrypt zzmessage zzcache
     EXPORT zzutil-targets
     LIBRARY DESTINATION lib
@@ -168,7 +170,7 @@ write_basic_package_version_file(
 )
 
 install(FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/cmake/zzutil-config.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/cmake/zzutil-config-version.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/zzutil-config.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/zzutil-config-version.cmake
     DESTINATION lib/cmake/zzutil
 )
