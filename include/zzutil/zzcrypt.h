@@ -10,11 +10,9 @@
 struct _zzcrypt_devhandle;
 struct _zzcrypt_keyhandle;
 struct _zzcrypt_apphandle;
-struct _zzcrypt_ctnhandle;
 typedef struct _zzcrypt_devhandle zzcrypt_devhandle_t, *zzcrypt_devhandle_p;
 typedef struct _zzcrypt_keyhandle zzcrypt_keyhandle_t, *zzcrypt_keyhandle_p;
 typedef struct _zzcrypt_apphandle zzcrypt_apphandle_t, *zzcrypt_apphandle_p;
-typedef struct _zzcrypt_ctnhandle zzcrypt_ctnhandle_t, *zzcrypt_ctnhandle_p;
 
 /// @brief 加密时的对齐方式
 typedef enum _zzcrypt_padding_t {
@@ -58,11 +56,23 @@ typedef struct _zzcrypt_cipherp_param {
 /// @return 错误代码, 0 表示成功
 int zzcrypt_init(zzcrypt_devhandle_t **hdev, FILE *log);
 
+/// @brief 初始化应用，生成一个应用句柄
+/// @param[in] hdev 设备句柄
+/// @param[in] app_name 应用名称
+/// @param[in] pin PIN 码
+/// @param[out] happ 应用句柄
+/// @return 错误代码, 0 表示成功
 int zzcrypt_init_app(const zzcrypt_devhandle_t *hdev, const char *app_name, const char *pin, zzcrypt_apphandle_t **happ);
 
-int zzcrypt_sm2_import_key(const zzcrypt_devhandle_t *hdev, const zzcrypt_apphandle_t *happ, const uint8_t *prikey, const uint8_t *pubkey, zzcrypt_ctnhandle_t **hctn);
+/// @brief 导入 SM2 密钥对
+/// @param[in] hdev 设备句柄
+/// @param[in] happ 应用句柄
+/// @param[in] prikey 私钥串(二进制表示)
+/// @param[in] pubkey 公钥串(二进制表示)
+/// @return 错误代码, 0 表示成功
+int zzcrypt_sm2_import_key(const zzcrypt_devhandle_t *hdev, const zzcrypt_apphandle_t *happ, const uint8_t *prikey, const uint8_t *pubkey);
 
-/// @brief SM2 加密
+/// @brief SM2 加密, 需要首先导入 SM2 密钥对
 /// @param[in] hdev 设备句柄
 /// @param[in] pubkey 公钥串(二进制表示)
 /// @param[in] data 待加密数据
@@ -72,7 +82,7 @@ int zzcrypt_sm2_import_key(const zzcrypt_devhandle_t *hdev, const zzcrypt_apphan
 /// @return 错误代码, 0 表示成功
 int zzcrypt_sm2_encrypt(const zzcrypt_devhandle_t *hdev, const uint8_t *pubkey, const uint8_t *data, size_t len, uint8_t **enc_data, size_t *enc_len);
 
-/// @brief SM2 解密
+/// @brief SM2 解密, 需要首先导入 SM2 密钥对
 /// @param[in] hdev 设备句柄
 /// @param[in] prikey 私钥串(二进制表示)
 /// @param[in] enc_data 待解密数据

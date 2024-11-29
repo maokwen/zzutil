@@ -23,8 +23,9 @@ typedef HANDLE skf_handle_t;
 
 static PSKF_FUNCLIST FunctionList;
 static bool is_initialized = false;
-static const u32 DEVICE_LOCK_TIMEOUT = 5000;
+static const u32 DeviceLockTimeout = 5000;
 static FILE *log_output = NULL;
+static const size_t VectorBufInitSize = 256;
 
 static bool load_library();
 static size_t sizeof_encoded_data(size_t cipher_len);
@@ -76,7 +77,7 @@ int zzcrypt_init(dev_t **hdev, FILE *log) {
     log_output = log;
 
     if (is_initialized) {
-        return ZZECODE_DEV_ALREADY_INIT;
+        return ZZECODE_CRYPO_ALREADY_INIT;
     }
 
     if (!load_library() && log_output) {
@@ -109,7 +110,7 @@ int zzcrypt_init(dev_t **hdev, FILE *log) {
     }
 
     /* lock device */ DISABLE {
-        ret = FunctionList->SKF_LockDev((*hdev)->skf_handle, DEVICE_LOCK_TIMEOUT);
+        ret = FunctionList->SKF_LockDev((*hdev)->skf_handle, DeviceLockTimeout);
         if (skf_error("SKF_LockDev", ret)) {
             return ZZECODE_SKF_ERR;
         }
@@ -129,25 +130,22 @@ int zzcrypt_init_app(const dev_t * hdev, const char * app_name, const char *pin,
     }
 
     app_t *app = malloc(sizeof(zzcrypt_apphandle_t));
+    *happ = app;
     app->is_initialized = false;
     ret = FunctionList->SKF_OpenApplication(hdev->skf_handle, (char *)app_name, &app->skf_handle);
     if (skf_error("SKF_OpenApplication", ret)) {
-        free(app);
         return ZZECODE_SKF_ERR;
     }
 
     ret = FunctionList->SKF_VerifyPIN(app->skf_handle, USER_TYPE, (char *)pin, &app->retry);
     if (skf_error("SKF_VerifyPIN", ret)) {
-        free(app);
         return ZZECODE_SKF_ERR;
     }
-
-    *happ = app;
 
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm2_import_key(const dev_t *hdev, const app_t *happ, const uint8_t *prikey, const uint8_t *pubkey, ctn_t **hctn) {
+int zzcrypt_sm2_import_key(const dev_t *hdev, const app_t *happ, const uint8_t *prikey, const uint8_t *pubkey) {
 
     /**
     *how to import sm2 keypair:
@@ -161,105 +159,81 @@ int zzcrypt_sm2_import_key(const dev_t *hdev, const app_t *happ, const uint8_t *
 
     int ret;
 
-    ctn_t *h = malloc(sizeof(zzcrypt_ctnhandle_t));
+    HCONTAINER hctn = NULL;
     
     // 1. create conatiner
-    ret = FunctionList->SKF_CreateContainer(happ->skf_handle, "ZZSM2", &(h->skf_handle));
+    ret = FunctionList->SKF_CreateContainer(happ->skf_handle, "ZZSM2", &hctn);
     if (ret) { // may exist
-        ret = FunctionList->SKF_OpenContainer(happ->skf_handle, "ZZSM2", &(h->skf_handle));
+        ret = FunctionList->SKF_OpenContainer(happ->skf_handle, "ZZSM2", &hctn);
         if (skf_error("SKF_OpenContainer", ret)) {
-            free(h);
             return ZZECODE_SKF_ERR;
         }
     }
 
     // 2. get the pubkey form ukey, copy pubkey to env
     int ctn_type = 0;
-    ret = FunctionList->SKF_GetContainerType(h->skf_handle, &ctn_type);
+    ret = FunctionList->SKF_GetContainerType(hctn, &ctn_type);
     if (skf_error("SKF_GetContainerType", ret)) {
-        free(h);
         return ZZECODE_SKF_ERR;
     }
 
     size_t pubkey_len = sizeof(ECCPUBLICKEYBLOB);
-    PECCPUBLICKEYBLOB p_pubkey = malloc(pubkey_len);
-    ret = FunctionList->SKF_ExportPublicKey(h->skf_handle, false, (u8 *)p_pubkey, &pubkey_len);
-    if (ret == 0x0A00001B && ctn_type == CTNF_ECC && p_pubkey->BitLen == 256) { // already import
-        free(h);
-        free(p_pubkey);
+    ECCPUBLICKEYBLOB pubkey_blob;
+    memset(&pubkey_blob, 0, sizeof(ECCPUBLICKEYBLOB));
+    ret = FunctionList->SKF_ExportPublicKey(hctn, false, (u8 *)&pubkey_blob, &pubkey_len);
+    if (ret == 0x0A00001B && ctn_type == CTNF_ECC && pubkey_blob.BitLen == 256) { // already import
         return ZZECODE_ALREADY_IMPORT;
     }
 
-    ret = FunctionList->SKF_ExportPublicKey(h->skf_handle, true, (u8 *)p_pubkey, &pubkey_len);
+    ret = FunctionList->SKF_ExportPublicKey(hctn, true, (u8 *)&pubkey_blob, &pubkey_len);
     if (ret == 0x0A00001B) {
-        ret = FunctionList->SKF_GenECCKeyPair(h->skf_handle, SGD_SM2_1, p_pubkey);
+        ret = FunctionList->SKF_GenECCKeyPair(hctn, SGD_SM2_1, &pubkey_blob);
         if (skf_error("SKF_GenECCKeyPair", ret)) {
-            free(h);
-            free(p_pubkey);
             return ZZECODE_SKF_ERR;
         }
     } else if (skf_error("SKF_ExportPublicKey", ret)) {
-        free(h);
-        free(p_pubkey);
         return ZZECODE_SKF_ERR;
     }
 
-    PENVELOPEDKEYBLOB env = malloc(sizeof(ENVELOPEDKEYBLOB));
-    memset(env, 0, sizeof(ENVELOPEDKEYBLOB));
-    env->Version = 0x00000001;
-    env->ulSymmAlgID = SGD_SM1_ECB;
-    env->ulBits = 256;
-    env->PubKey.BitLen = 256;
-    memcpy(env->PubKey.XCoordinate + 32, pubkey, 32);
-    memcpy(env->PubKey.YCoordinate + 32, pubkey + 32, 32);
+    ENVELOPEDKEYBLOB env_blob;;
+    memset(&env_blob, 0, sizeof(ENVELOPEDKEYBLOB));
+    env_blob.Version = 0x00000001;
+    env_blob.ulSymmAlgID = SGD_SM1_ECB;
+    env_blob.ulBits = 256;
+    env_blob.PubKey.BitLen = 256;
+    memcpy(env_blob.PubKey.XCoordinate + 32, pubkey, 32);
+    memcpy(env_blob.PubKey.YCoordinate + 32, pubkey + 32, 32);
 
     // 3. use sm1 algo encrypt prikey and then copy to env.cbEncryptedPriKey
     u8 key[16] = {0x47,0x50,0x42,0x02,0x20,0x3F,0xE1,0x92,0x66,0x2A,0xCB,0xD2,0x9D,0x11,0x22,0x33};
     HANDLE hkey = NULL;
     ret = FunctionList->SKF_SetSymmKey(hdev->skf_handle, key, SGD_SM1_ECB, &hkey);
     if (skf_error("SKF_SetSymmKey", ret)) {
-        free(h);
-        free(p_pubkey);
-        free(env);
         return ZZECODE_SKF_ERR;
     }
     BLOCKCIPHERPARAM bp;
     memset(&bp, 0, sizeof(BLOCKCIPHERPARAM));
     ret = FunctionList->SKF_EncryptInit(hkey, bp);
     if (skf_error("SKF_EncryptInit", ret)) {
-        free(h);
-        free(p_pubkey);
-        free(env);
         return ZZECODE_SKF_ERR;
     }
     u32 enclen = 128;
-    ret = FunctionList->SKF_Encrypt(hkey, (u8 *)prikey, 32, env->cbEncryptedPriKey + 32, &enclen);
+    ret = FunctionList->SKF_Encrypt(hkey, (u8 *)prikey, 32, env_blob.cbEncryptedPriKey + 32, &enclen);
     if (skf_error("SKF_Encrypt", ret)) {
-        free(h);
-        free(p_pubkey);
-        free(env);
         return ZZECODE_SKF_ERR;
     }
 
     // 4. use sm2 pubkey encrypt sm1/sm4 key, and then copy to env.ECCCipherBlob
-    ret = FunctionList->SKF_ExtECCEncrypt(hdev->skf_handle, p_pubkey, key, 16, &env->ECCCipherBlob);
+    ret = FunctionList->SKF_ExtECCEncrypt(hdev->skf_handle, &pubkey_blob, key, 16, &env_blob.ECCCipherBlob);
     if (skf_error("SKF_ExtECCEncrypt", ret)) {
-        free(h);
-        free(p_pubkey);
-        free(env);
         return ZZECODE_SKF_ERR;
     }
 
     // 5. inport keypair
-    ret = FunctionList->SKF_ImportECCKeyPair(h->skf_handle, env);
+    ret = FunctionList->SKF_ImportECCKeyPair(hctn, &env_blob);
     if (skf_error("SKF_ImportECCKeyPair", ret)) {
-        free(h);
-        free(p_pubkey);
-        free(env);
         return ZZECODE_SKF_ERR;
     }
-
-    *hctn = h;
 
     return ZZECODE_OK;
 }
@@ -270,45 +244,27 @@ int zzcrypt_sm2_encrypt(const dev_t *hdev, const uint8_t *pubkey, const uint8_t 
         return ZZECODE_CRYPO_NO_INIT;
     }
 
-    // encrypt data
-    /*
-    PECCPUBLICKEYBLOB p_pubkey = malloc(sizeof(ECCPUBLICKEYBLOB));
-    memset(p_pubkey, 0, sizeof(ECCPUBLICKEYBLOB));
-    size_t pubkey_len = sizeof(ECCPUBLICKEYBLOB);
-        ret = FunctionList->SKF_ExportPublicKey(hctn->skf_handle, true, (u8 *)p_pubkey, &pubkey_len);
-    if (ret == 0x0A00001B) {
-        ret = FunctionList->SKF_GenECCKeyPair(hctn->skf_handle, SGD_SM2_2, p_pubkey);
-        if (skf_error("SKF_GenECCKeyPair", ret)) {
-            free(p_pubkey);
-            return ZZECODE_SKF_ERR;
-        }
-    } else if (skf_error("SKF_ExportPublicKey", ret)) {
-        free(p_pubkey);
-        return ZZECODE_SKF_ERR;
-    }
-    */
+    ECCPUBLICKEYBLOB pubkey_blob;
+    memset(&pubkey_blob, 0, sizeof(ECCPUBLICKEYBLOB));
+    pubkey_blob.BitLen = 256;
+    memcpy(pubkey_blob.XCoordinate + 32, pubkey, 32);
+    memcpy(pubkey_blob.YCoordinate + 32, pubkey + 32, 32);
 
-    PECCPUBLICKEYBLOB p_pubkey = malloc(sizeof(ECCPUBLICKEYBLOB));
-    memset(p_pubkey, 0, sizeof(ECCPUBLICKEYBLOB));
-    p_pubkey->BitLen = 256;
-    memcpy(p_pubkey->XCoordinate + 32, pubkey, 32);
-    memcpy(p_pubkey->YCoordinate + 32, pubkey + 32, 32);
+    // u8 *p = malloc(100);
 
-    u8 *p = malloc(100);
-
-    PECCCIPHERBLOB p_res = malloc(sizeof(ECCCIPHERBLOB));
-    memset(p_res, 0, sizeof(ECCCIPHERBLOB));
-    ret = FunctionList->SKF_ExtECCEncrypt(hdev->skf_handle, p_pubkey, (u8 *)data, (u32)len, p_res);
+    ECCCIPHERBLOB res_blob;
+    memset(&res_blob, 0, sizeof(ECCCIPHERBLOB));
+    ret = FunctionList->SKF_ExtECCEncrypt(hdev->skf_handle, &pubkey_blob, (u8 *)data, (u32)len, &res_blob);
     if (skf_error("SKF_ExtECCEncrypt", ret)) {
         return ZZECODE_SKF_ERR;
     }
 
-    u8 *q = malloc(100);
+    // u8 *q = malloc(100);
 
-    size_t real_len = sizeof_encoded_data((size_t)(p_res->CipherLen));
+    size_t real_len = sizeof_encoded_data((size_t)(res_blob.CipherLen));
     *enc_len = real_len;
     *enc_data = malloc(real_len * sizeof(u8));
-    memcpy(*enc_data, p_res, real_len * sizeof(u8));
+    memcpy(*enc_data, &res_blob, real_len * sizeof(u8));
 
     return ZZECODE_OK;
 }
@@ -320,25 +276,28 @@ int zzcrypt_sm2_decrypt(const dev_t *hdev, const uint8_t *prikey, const uint8_t 
         return ZZECODE_CRYPO_NO_INIT;
     }
 
-    PECCPRIVATEKEYBLOB p_prikey = malloc(sizeof(ECCPRIVATEKEYBLOB));
-    memset(p_prikey, 0, sizeof(ECCPRIVATEKEYBLOB));
-    p_prikey->BitLen = 256;
-    memcpy(p_prikey->PrivateKey + 32, prikey, 32);
+    ECCPRIVATEKEYBLOB prikey_blob;
+    memset(&prikey_blob, 0, sizeof(ECCPRIVATEKEYBLOB));
+    prikey_blob.BitLen = 256;
+    memcpy(prikey_blob.PrivateKey + 32, prikey, 32);
 
-    PECCCIPHERBLOB p_enc_data = (PECCCIPHERBLOB)malloc(sizeof(ECCCIPHERBLOB) + enc_len * sizeof(u8) - sizeof(u8 *));
-    p_enc_data->CipherLen = (u32)enc_len;
-    memcpy(p_enc_data, enc_data, enc_len * sizeof(u8));
+    PECCCIPHERBLOB p_enc = (PECCCIPHERBLOB)malloc(sizeof_encoded_data(enc_len));
+    p_enc->CipherLen = (u32)enc_len;
+    memcpy(p_enc, enc_data, enc_len * sizeof(u8));
 
     u8 *buf = malloc(enc_len * sizeof(u8)); // typically, the decrypted data is not longer than the encrypted data
     u32 de_len = (u32)enc_len;
-    ret = FunctionList->SKF_ExtECCDecrypt(hdev->skf_handle, p_prikey, p_enc_data, buf, &de_len);
+    ret = FunctionList->SKF_ExtECCDecrypt(hdev->skf_handle, &prikey_blob, p_enc, buf, &de_len);
     if (skf_error("SKF_ExtECCDecrypt", ret)) {
+        free(buf);
+        free(p_enc);
         return ZZECODE_SKF_ERR;
     }
 
     *len = de_len;
     *data = malloc(de_len * sizeof(u8));
     memcpy(*data, buf, de_len * sizeof(u8));
+    free(buf);
 
     return ZZECODE_OK;
 }
@@ -346,9 +305,10 @@ int zzcrypt_sm2_decrypt(const dev_t *hdev, const uint8_t *prikey, const uint8_t 
 int zzcrypt_sm4_import_key(const dev_t *hdev, const uint8_t *key, key_t **hkey) {
     int ret;
 
-    *hkey = malloc(sizeof(key_t));
-    (*hkey)->is_initialized = false;
-    ret = FunctionList->SKF_SetSymmKey(hdev->skf_handle, (u8 *)key, SGD_SMS4_ECB, &((*hkey)->skf_handle));
+    key_t *h = malloc(sizeof(key_t));
+    h->is_initialized = false;
+    *hkey = h;
+    ret = FunctionList->SKF_SetSymmKey(hdev->skf_handle, (u8 *)key, SGD_SMS4_ECB, &h->skf_handle);
     if (skf_error("SKF_SetSymmKey", ret)) {
         return ZZECODE_SKF_ERR;
     }
@@ -360,7 +320,7 @@ int zzcrypt_sm4_encrypt_init(key_t *hkey, cparam_t param) {
     int ret;
 
     if (hkey->is_initialized) {
-        return ZZECODE_OK;
+        return ZZECODE_CRYPO_ALREADY_INIT;
     }
 
     BLOCKCIPHERPARAM p = gen_block_cipher_param(&param);
@@ -369,8 +329,8 @@ int zzcrypt_sm4_encrypt_init(key_t *hkey, cparam_t param) {
         return ZZECODE_SKF_ERR;
     }
 
-    hkey->buf = malloc(1024 * sizeof(u8));
-    hkey->buf_len = 1024;
+    hkey->buf = malloc(VectorBufInitSize * sizeof(u8));
+    hkey->buf_len = VectorBufInitSize;
     hkey->data_ptr = hkey->buf;
     hkey->data_len = 0;
 
@@ -466,7 +426,7 @@ int zzcrypt_sm4_decrypt_init(key_t *hkey, cparam_t param) {
     int ret;
 
     if (hkey->is_initialized) {
-        return ZZECODE_OK;
+        return ZZECODE_CRYPO_ALREADY_INIT;
     }
 
     BLOCKCIPHERPARAM p = gen_block_cipher_param(&param);
@@ -475,8 +435,8 @@ int zzcrypt_sm4_decrypt_init(key_t *hkey, cparam_t param) {
         return ZZECODE_SKF_ERR;
     }
 
-    hkey->buf = malloc(1024 * sizeof(u8));
-    hkey->buf_len = 1024;
+    hkey->buf = malloc(VectorBufInitSize * sizeof(u8));
+    hkey->buf_len = VectorBufInitSize;
     hkey->data_ptr = hkey->buf;
     hkey->data_len = 0;
 
@@ -642,7 +602,7 @@ bool load_library() {
 }
 
 size_t sizeof_encoded_data(size_t cipher_len) {
-    return sizeof(ECCCIPHERBLOB) - 1 + cipher_len;
+    return sizeof(ECCCIPHERBLOB) + cipher_len * sizeof(u8); // - sizeof(u8 *);
 }
 
 void print_device_info(skf_handle_t hdev) {

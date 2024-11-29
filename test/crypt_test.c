@@ -338,9 +338,8 @@ void test_sm2(zzcrypt_devhandle_p hdev) {
     u8 *enc_data;
     size_t enc_len;
     zzcrypt_apphandle_p happ = NULL;
-    zzcrypt_ctnhandle_p hctn = NULL;
     zzcrypt_init_app(hdev, "zzmaintenancetool", "87654321", &happ);
-    zzcrypt_sm2_import_key(hdev, happ, prikey, pubkey, &hctn);
+    zzcrypt_sm2_import_key(hdev, happ, prikey, pubkey);
     zzcrypt_sm2_encrypt(hdev, pubkey, data, 3, &enc_data, &enc_len);
     zzhex_print_data_hex("enc_data", enc_data, enc_len);
 
@@ -357,7 +356,6 @@ void test_sm2_from_hex(zzcrypt_devhandle_p hdev) {
     int ret = 0;
 
     zzcrypt_apphandle_p happ = NULL;
-    zzcrypt_ctnhandle_p hctn = NULL;
     zzcrypt_init_app(hdev, "zzmaintenancetool", "87654321", &happ);
 
     u8 *pubkey, *prikey;
@@ -372,7 +370,7 @@ void test_sm2_from_hex(zzcrypt_devhandle_p hdev) {
     assert(prikey_len == 32);
     assert(pubkey_len == 64);
 
-    zzcrypt_sm2_import_key(hdev, happ, prikey, pubkey, &hctn);
+    zzcrypt_sm2_import_key(hdev, happ, prikey, pubkey);
 
     u8 data[3] = {0x11,0x22,0x33};
     u8 *enc_data;
@@ -393,7 +391,6 @@ void test_sm2_long(zzcrypt_devhandle_p hdev) {
     int ret = 0;
 
     zzcrypt_apphandle_p happ = NULL;
-    zzcrypt_ctnhandle_p hctn = NULL;
     zzcrypt_init_app(hdev, "zzmaintenancetool", "87654321", &happ);
 
     u8 *pubkey, *prikey;
@@ -425,7 +422,7 @@ void test_sm2_long(zzcrypt_devhandle_p hdev) {
     prikey = keypair + 64;
     prikey_len = 32;
 
-    zzcrypt_sm2_import_key(hdev, happ, prikey, pubkey, &hctn);
+    zzcrypt_sm2_import_key(hdev, happ, prikey, pubkey);
 
     // u8 data[3] = {0x11,0x22,0x33};
     // u8 data[67] = {0x7b,0x22,0x75,0x6b,0x65,0x79,0x5f,0x6d,0x61,0x63,0x22,0x3a,0x22,0x34,0x34,0x3a,0x41,0x33,0x3a,0x42,0x42,0x3a,0x35,0x35,0x3a,0x38,0x46,0x3a,0x42,0x36,0x22,0x2c,0x22,0x75,0x6b,0x65,0x79,0x5f,0x73,0x65,0x72,0x69,0x61,0x6c,0x6e,0x6f,0x22,0x3a,0x22,0x34,0x44,0x33,0x38,0x34,0x36,0x33,0x35,0x33,0x37,0x30,0x36,0x33,0x38,0x32,0x45,0x22,0x7d,};
@@ -455,7 +452,6 @@ void test_sm2_gw(zzcrypt_devhandle_p hdev) {
     int ret = 0;
 
     zzcrypt_apphandle_p happ = NULL;
-    zzcrypt_ctnhandle_p hctn = NULL;
     zzcrypt_init_app(hdev, "zzmaintenancetool", "87654321", &happ);
 
     u8 *pubkey, *prikey;
@@ -492,15 +488,15 @@ int main() {
     ret = zzcrypt_init(&hdev, stderr);
     assert(ret == ZZECODE_OK);
 
-    // test_sm4_ecb(hdev);
-    // test_sm4_ecb_padding(hdev);
-    // test_sm4_ecb_padding_zero(hdev);
-    // test_sm4_ecb_padding_pkcs5(hdev);
-    // test_sm4_cbc(hdev);
+    test_sm4_ecb(hdev);
+    test_sm4_ecb_padding(hdev);
+    test_sm4_ecb_padding_zero(hdev);
+    test_sm4_ecb_padding_pkcs5(hdev);
+    test_sm4_cbc(hdev);
 
-    // test_sm2(hdev);
-    // test_sm2_from_hex(hdev);
-    // test_sm2_long(hdev);
+    test_sm2(hdev);
+    test_sm2_from_hex(hdev);
+    test_sm2_long(hdev);
     test_sm2_gw(hdev);
 
     pasue_on_exit();
