@@ -28,7 +28,7 @@ static FILE *log_output = NULL;
 static const size_t VectorBufInitSize = 256;
 
 static bool load_library();
-static size_t sizeof_encoded_data(size_t cipher_len);
+static size_t sm2_sizeof_encoded_data(size_t cipher_len);
 static void print_device_info(skf_handle_t hdev);
 static bool skf_error(const char *msg, int ret);
 static BLOCKCIPHERPARAM gen_block_cipher_param(const cparam_t *param);
@@ -48,7 +48,7 @@ struct _zzcrypt_keyhandle {
     bool is_initialized;
     // vector buffer for sm4 encryption/decryption
     u8 *buf;
-    u32 buf_len;
+    size_t buf_len;
     u8 *data_ptr;
     u32 data_len;
 };
@@ -177,9 +177,9 @@ int zzcrypt_sm2_import_key(const dev_t *hdev, const app_t *happ, const uint8_t *
         return ZZECODE_SKF_ERR;
     }
 
-    size_t pubkey_len = sizeof(ECCPUBLICKEYBLOB);
+    u32 pubkey_len = (u32)sizeof(ECCPUBLICKEYBLOB);
     ECCPUBLICKEYBLOB pubkey_blob;
-    memset(&pubkey_blob, 0, sizeof(ECCPUBLICKEYBLOB));
+    memset(&pubkey_blob, 0, pubkey_len);
     ret = FunctionList->SKF_ExportPublicKey(hctn, false, (u8 *)&pubkey_blob, &pubkey_len);
     if (ret == 0x0A00001B && ctn_type == CTNF_ECC && pubkey_blob.BitLen == 256) { // already import
         return ZZECODE_ALREADY_IMPORT;
@@ -195,46 +195,52 @@ int zzcrypt_sm2_import_key(const dev_t *hdev, const app_t *happ, const uint8_t *
         return ZZECODE_SKF_ERR;
     }
 
-    ENVELOPEDKEYBLOB env_blob;;
-    memset(&env_blob, 0, sizeof(ENVELOPEDKEYBLOB));
-    env_blob.Version = 0x00000001;
-    env_blob.ulSymmAlgID = SGD_SM1_ECB;
-    env_blob.ulBits = 256;
-    env_blob.PubKey.BitLen = 256;
-    memcpy(env_blob.PubKey.XCoordinate + 32, pubkey, 32);
-    memcpy(env_blob.PubKey.YCoordinate + 32, pubkey + 32, 32);
-
     // 3. use sm1 algo encrypt prikey and then copy to env.cbEncryptedPriKey
+    size_t buf_len = sizeof(ENVELOPEDKEYBLOB) + sm2_sizeof_encoded_data(16);
+    PENVELOPEDKEYBLOB env_blob = malloc(buf_len);
+    memset(env_blob, 0, buf_len);
+    env_blob->Version = 0x00000001;
+    env_blob->ulSymmAlgID = SGD_SM1_ECB;
+    env_blob->ulBits = 256;
+    env_blob->PubKey.BitLen = 256;
+    memcpy(env_blob->PubKey.XCoordinate + 32, pubkey, 32);
+    memcpy(env_blob->PubKey.YCoordinate + 32, pubkey + 32, 32);
     u8 key[16] = {0x47,0x50,0x42,0x02,0x20,0x3F,0xE1,0x92,0x66,0x2A,0xCB,0xD2,0x9D,0x11,0x22,0x33};
     HANDLE hkey = NULL;
     ret = FunctionList->SKF_SetSymmKey(hdev->skf_handle, key, SGD_SM1_ECB, &hkey);
     if (skf_error("SKF_SetSymmKey", ret)) {
+        free(env_blob);
         return ZZECODE_SKF_ERR;
     }
     BLOCKCIPHERPARAM bp;
     memset(&bp, 0, sizeof(BLOCKCIPHERPARAM));
     ret = FunctionList->SKF_EncryptInit(hkey, bp);
     if (skf_error("SKF_EncryptInit", ret)) {
+        free(env_blob);
         return ZZECODE_SKF_ERR;
     }
     u32 enclen = 128;
-    ret = FunctionList->SKF_Encrypt(hkey, (u8 *)prikey, 32, env_blob.cbEncryptedPriKey + 32, &enclen);
+    ret = FunctionList->SKF_Encrypt(hkey, (u8 *)prikey, 32, env_blob->cbEncryptedPriKey + 32, &enclen);
     if (skf_error("SKF_Encrypt", ret)) {
+        free(env_blob);
         return ZZECODE_SKF_ERR;
     }
 
     // 4. use sm2 pubkey encrypt sm1/sm4 key, and then copy to env.ECCCipherBlob
-    ret = FunctionList->SKF_ExtECCEncrypt(hdev->skf_handle, &pubkey_blob, key, 16, &env_blob.ECCCipherBlob);
+    ret = FunctionList->SKF_ExtECCEncrypt(hdev->skf_handle, &pubkey_blob, key, 16, &env_blob->ECCCipherBlob);
     if (skf_error("SKF_ExtECCEncrypt", ret)) {
+        free(env_blob);
         return ZZECODE_SKF_ERR;
     }
 
     // 5. inport keypair
-    ret = FunctionList->SKF_ImportECCKeyPair(hctn, &env_blob);
+    ret = FunctionList->SKF_ImportECCKeyPair(hctn, env_blob);
     if (skf_error("SKF_ImportECCKeyPair", ret)) {
+        free(env_blob);
         return ZZECODE_SKF_ERR;
     }
 
+    free(env_blob);
     return ZZECODE_OK;
 }
 
@@ -251,20 +257,21 @@ int zzcrypt_sm2_encrypt(const dev_t *hdev, const uint8_t *pubkey, const uint8_t 
     memcpy(pubkey_blob.YCoordinate + 32, pubkey + 32, 32);
 
     // u8 *p = malloc(100);
-
-    ECCCIPHERBLOB res_blob;
-    memset(&res_blob, 0, sizeof(ECCCIPHERBLOB));
-    ret = FunctionList->SKF_ExtECCEncrypt(hdev->skf_handle, &pubkey_blob, (u8 *)data, (u32)len, &res_blob);
+    size_t buf_len = sm2_sizeof_encoded_data(len);
+    PECCCIPHERBLOB res_blob = malloc(buf_len);
+    memset(res_blob, 0, buf_len);
+    ret = FunctionList->SKF_ExtECCEncrypt(hdev->skf_handle, &pubkey_blob, (u8 *)data, (u32)len, res_blob);
     if (skf_error("SKF_ExtECCEncrypt", ret)) {
+        free(res_blob);
         return ZZECODE_SKF_ERR;
     }
-
     // u8 *q = malloc(100);
 
-    size_t real_len = sizeof_encoded_data((size_t)(res_blob.CipherLen));
+    size_t real_len = sm2_sizeof_encoded_data((size_t)(res_blob->CipherLen));
     *enc_len = real_len;
     *enc_data = malloc(real_len * sizeof(u8));
-    memcpy(*enc_data, &res_blob, real_len * sizeof(u8));
+    memcpy(*enc_data, res_blob, real_len * sizeof(u8));
+    free(res_blob);
 
     return ZZECODE_OK;
 }
@@ -281,7 +288,7 @@ int zzcrypt_sm2_decrypt(const dev_t *hdev, const uint8_t *prikey, const uint8_t 
     prikey_blob.BitLen = 256;
     memcpy(prikey_blob.PrivateKey + 32, prikey, 32);
 
-    PECCCIPHERBLOB p_enc = (PECCCIPHERBLOB)malloc(sizeof_encoded_data(enc_len));
+    PECCCIPHERBLOB p_enc = (PECCCIPHERBLOB)malloc(sm2_sizeof_encoded_data(enc_len));
     p_enc->CipherLen = (u32)enc_len;
     memcpy(p_enc, enc_data, enc_len * sizeof(u8));
 
@@ -369,6 +376,7 @@ int zzcrypt_sm4_encrypt_push(key_t *hkey, const uint8_t *data, size_t len) {
     while (hkey->data_len + new_len > hkey->buf_len) {
         hkey->buf_len *= 2;
         hkey->buf = realloc(hkey->buf, hkey->buf_len);
+        hkey->data_ptr = hkey->buf + hkey->data_len;
     }
 
     // TODO: padding data if needed
@@ -391,7 +399,8 @@ int zzcrypt_sm4_encrypt_peek(const key_t *hkey, uint8_t **enc_data, size_t *enc_
         return ZZECODE_CRYPO_NO_INIT;
     }
 
-    *enc_data = hkey->buf;
+    *enc_data = malloc(hkey->data_len * sizeof(u8));
+    memcpy(*enc_data, hkey->buf, hkey->data_len * sizeof(u8));
     *enc_len = hkey->data_len;
 
     return ZZECODE_OK;
@@ -475,6 +484,7 @@ int zzcrypt_sm4_decrypt_push(key_t *hkey, const uint8_t *data, size_t len) {
     while (hkey->data_len + new_len > hkey->buf_len) {
         hkey->buf_len *= 2;
         hkey->buf = realloc(hkey->buf, hkey->buf_len);
+        hkey->data_ptr = hkey->buf + hkey->data_len;
     }
 
     // TODO: padding data if needed
@@ -496,7 +506,8 @@ int zzcrypt_sm4_decrypt_peek(const key_t *hkey, uint8_t **enc_data, size_t *enc_
         return ZZECODE_CRYPO_NO_INIT;
     }
 
-    *enc_data = hkey->buf;
+    *enc_data = malloc(hkey->data_len * sizeof(u8));
+    memcpy(*enc_data, hkey->buf, hkey->data_len * sizeof(u8));
     *enc_len = hkey->data_len;
 
     return ZZECODE_OK;
@@ -522,6 +533,7 @@ int zzcrypt_sm4_decrypt_pop(key_t *hkey, uint8_t **enc_data, size_t *enc_len) {
     memcpy(*enc_data, hkey->buf, hkey->data_len * sizeof(u8));
 
     free(hkey->buf);
+    hkey->buf = NULL;
     hkey->is_initialized = false;
 
     return ZZECODE_OK;
@@ -556,7 +568,11 @@ bool load_library() {
     if (p) {
         *p = 0;
     }
+#ifdef _WIN64
+    strcat_s(path, sizeof(path), "\\SKF_ukey_x86_64_1.7.22.0117.dll");
+#else
     strcat_s(path, sizeof(path), "\\SKF_ukey_i686_1.7.22.0117.dll");
+#endif
     lib_handle = LoadLibrary(path);
     if (lib_handle == NULL) {
         ret = GetLastError();
@@ -601,7 +617,7 @@ bool load_library() {
     return true;
 }
 
-size_t sizeof_encoded_data(size_t cipher_len) {
+size_t sm2_sizeof_encoded_data(size_t cipher_len) {
     return sizeof(ECCCIPHERBLOB) + cipher_len * sizeof(u8); // - sizeof(u8 *);
 }
 

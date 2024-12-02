@@ -9,7 +9,6 @@
 #include "testutil.h"
 
 int main(int agrc, char *agrv[]) {
-    int ret;
     char *s;
 
     // test insert and find

@@ -91,10 +91,12 @@ int zzhex_print_data_hex(char *info, unsigned char *data, size_t len) {
     if (info) {
         printf("%s\n", info);
     }
-    for (unsigned i = 0; i < len; i++) {
-        if (i && i % 16 == 0)
-            printf("\n");
-        printf("%02x", data[i]);
+    for (unsigned i = 0; i < len; ++i) {
+        if ((i + 1) % 16 == 0) {
+            printf("%02x\n", data[i]);
+        } else {
+            printf("%02x ", data[i]);
+        }
     }
     printf("\n");
 

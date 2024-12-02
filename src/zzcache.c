@@ -278,6 +278,7 @@ void *expire_check_routine(void *arg) {
 
         dosleep(CLEANUP_INTERVAL_MILISEC);
     }
+    return ZZECODE_OK;
 }
 
 #ifdef _WIN32
