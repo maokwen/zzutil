@@ -618,7 +618,7 @@ bool load_library() {
 }
 
 size_t sm2_sizeof_encoded_data(size_t cipher_len) {
-    return sizeof(ECCCIPHERBLOB) + cipher_len * sizeof(u8); // - sizeof(u8 *);
+    return sizeof(ECCCIPHERBLOB) + cipher_len * sizeof(u8) - 1; // - sizeof(u8 *);
 }
 
 void print_device_info(skf_handle_t hdev) {
@@ -681,7 +681,7 @@ BLOCKCIPHERPARAM gen_block_cipher_param(const cparam_t *param) {
 
     return p;
 }
-
+ 
 bool read_key_from_hex_string(const char *str, u8 **key, size_t *key_len) {
     zzhex_hex_to_bin(str, key, key_len);
 }
