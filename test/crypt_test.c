@@ -7,9 +7,13 @@
 #include <zzutil/errmsg.h>
 #include <zzutil/zzcrypt.h>
 #include <zzutil/zzhex.h>
-#include <zzutil/basetype.h>
 
 #include "testutil.h"
+
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
 
 void test_sm4_ecb(zzcrypt_devhandle_p hdev) {
     int ret;

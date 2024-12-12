@@ -8,6 +8,16 @@
 
 #include "testutil.h"
 
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
+typedef zz_udp_socket_t udp_socket;
+typedef zz_ip_address_t ip_addr;
+typedef zz_mac_address_t mac_addr;
+typedef zz_udp_address_t udp_addr;
+typedef zz_adapter_info_t adapter_info;
+
 bool starts_with(const char *str, const char *prefix) {
     size_t prefix_len = strlen(prefix);
     size_t str_len = strlen(str);
@@ -20,11 +30,11 @@ bool starts_with(const char *str, const char *prefix) {
 int main(int agrc, char *agrv[]) {
     int ret;
 
-    ip_address ip = {239, 255, 43, 21};
+    zz_ip_address_t ip = {239, 255, 43, 21};
     u16 port = 30040;
-    udp_address addr = {ip, port};
+    zz_udp_address_t addr = {ip, port};
 
-    udp_socket socket;
+    zz_udp_socket_t *socket = NULL;
 
     ret = zzmsg_init();
     if (ret) {
@@ -48,14 +58,14 @@ int main(int agrc, char *agrv[]) {
     }
 
     // get local ip
-    ip_address local_ip = {0, 0, 0, 0};
+    ip_addr local_ip = {0, 0, 0, 0};
     for (u32 i = 0; i < count; i++) {
         printf("name: %s\n", ifs[i].name);
         if (ifs[i].mac.is_valid) {
             printf("mac: %02X:%02X:%02X:%02X:%02X:%02X\n", ifs[i].mac.addr[0], ifs[i].mac.addr[1], ifs[i].mac.addr[2], ifs[i].mac.addr[3], ifs[i].mac.addr[4], ifs[i].mac.addr[5]);
         }
         for (int j = 0; j < ifs[i].ip_count; j++) {
-            printf("ip: %s\n", ip2str(ifs[i].ip[j]));
+            printf("ip: %s\n", zzmsg_ip2str(ifs[i].ip[j]));
             if (ifs[i].ip[j].a == 192 && ifs[i].ip[j].b == 168 && ifs[i].ip[j].c == 28) {
                 local_ip = ifs[i].ip[j];
                 break;
@@ -63,7 +73,7 @@ int main(int agrc, char *agrv[]) {
         }
         printf("\n");
     }
-    printf("local ip: %s\n", ip2str(local_ip));
+    printf("local ip: %s\n", zzmsg_ip2str(local_ip));
 
     // bind recive socket
     ret = zzmsg_bind_socket(socket, port, &local_ip);
@@ -81,7 +91,7 @@ int main(int agrc, char *agrv[]) {
 
     // receive message
     u8 buf[1024];
-    udp_address from;
+    udp_addr from;
     u32 receive_len;
     while (1) {
         printf("waiting for message...\n");
@@ -91,7 +101,7 @@ int main(int agrc, char *agrv[]) {
             continue;
         } else {
             printf("recv: %s\n", buf);
-            printf("from: %s\n", udp2str(from));
+            printf("from: %s\n", zzmsg_udp2str(from));
             printf("total: %d bytes\n", receive_len);
         }
 

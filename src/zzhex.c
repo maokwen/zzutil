@@ -1,5 +1,6 @@
-#include <zzutil/basetype.h>
-#include <zzutil/zzhex.h>
+#include "zzutil/zzhex.h"
+#include "common/helper.h"
+
 #include <zzutil/errmsg.h>
 
 #include <string.h>

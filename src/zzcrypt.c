@@ -1,14 +1,15 @@
-#include <stdio.h>
-#include <stdbool.h>
+#include "zzutil/zzcrypt.h"
+#include "common/helper.h"
 
 #include <zzutil/zzcrypt.h>
 #include <zzutil/zzhex.h>
 #include <zzutil/errmsg.h>
 
+#include <stdio.h>
+#include <stdbool.h>
+
 #include <skf.h>
 
-#include "common/helper.h"
-#include "zzutil/zzcrypt.h"
 
 /************************************************************
  * Declears

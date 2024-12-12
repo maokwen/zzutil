@@ -1,5 +1,7 @@
 #include "zzutil/zzcache.h"
-#include "zzutil/errmsg.h"
+#include "common/helper.h"
+
+#include <zzutil/errmsg.h>
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -52,7 +54,7 @@ static void *expire_check_routine(void *arg);
 #endif
 
 /* calcu hash */
-static unsigned int hash(char *key);
+static unsigned int hash(const char *key);
 /* routine to cleanup thread before kill a thread */
 /* stop thread and free memory */
 static void on_destory(zzcache *table);
@@ -147,7 +149,7 @@ void zzcache_free_table(zzcache *table) {
 #endif
 }
 
-void zzcache_insert(zzcache *table, char *key, u8 *value) {
+void zzcache_insert(zzcache *table, const char *key, const u8 *value) {
     unsigned int slot = hash(key);
 
     wrlock(table, true);
@@ -226,7 +228,7 @@ void zzcache_remove(zzcache *table, char *key) {
 
 /* SECTION implement */
 
-unsigned int hash(char *key) {
+unsigned int hash(const char *key) {
     unsigned int hash = 0;
     while (*key) {
         hash = (hash << 5) + *key++;

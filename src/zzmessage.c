@@ -1,5 +1,7 @@
 #include "zzutil/zzmessage.h"
-#include "zzutil/errmsg.h"
+#include "common/helper.h"
+
+#include <zzutil/errmsg.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,31 +26,51 @@
 #include <netpacket/packet.h>
 #endif
 
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
+
+struct _zzmsg_udp_socket {
+#ifdef _WIN32
+    void *sock_ptr;
+#endif
+#ifdef _UNIX
+    void *sock_ptr;
+#endif
+};
+
+typedef struct _zzmsg_udp_socket udp_socket;
+typedef struct _zzmsg_ip_address ip_addr;
+typedef struct _zzmsg_mac_address mac_addr;
+typedef struct _zzmsg_udp_address udp_addr;
+typedef struct _zzmsg_adapter_info adapter_info;
+
 #ifdef _WIN32
 static IN_ADDR ipconv_zz2win(u8 a, u8 b, u8 c, u8 d);
 static SOCKADDR_IN addrconv_zz2win(u8 a, u8 b, u8 c, u8 d, u16 port);
-static udp_address addrconv_win2zz(SOCKADDR_IN addr);
-/* convert mac address string to mac_address */
-static mac_address addrconv_win2mac(u8 *mac);
+static udp_addr addrconv_win2zz(SOCKADDR_IN addr);
+/* convert mac address string to mac_addr */
+static mac_addr addrconv_win2mac(u8 *mac);
 #endif
 
 #ifdef _UNIX
 static in_addr_t ipconv_zz2unix(u8 a, u8 b, u8 c, u8 d);
 static struct sockaddr_in addrconv_zz2unix(u8 a, u8 b, u8 c, u8 d, u16 port);
-static udp_address addrconv_unix2zz(struct sockaddr_in addr);
-static mac_address macconv_unix2zz(struct sockaddr_ll *addr);
+static udp_addr addrconv_unix2zz(struct sockaddr_in addr);
+static mac_addr macconv_unix2zz(struct sockaddr_ll *addr);
 static ip_address ipconv_unix2zz(struct sockaddr_in *addr);
 #endif
 
 static int zzmsg_is_initilized = 0;
 /* convert ip address string to ip_address */
-static ip_address addrconv_str2ip(char *);
+static ip_addr addrconv_str2ip(char *);
 /* check if initialized */
 static int check_init();
 /* Set socket reusable */
-static int set_socket_reusable(udp_socket sock);
+static int set_socket_reusable(const udp_socket *sock);
 /* Set socket interface */
-static int set_socket_if(udp_socket sock, ip_address ip);
+static int set_socket_if(const udp_socket *sock, ip_addr ip);
 
 /* Init */
 int zzmsg_init() {
@@ -64,16 +86,21 @@ int zzmsg_init() {
 }
 
 /* Create socket */
-int zzmsg_create_socket(udp_socket *sock) {
+int zzmsg_create_socket(udp_socket **sock) {
     if (check_init()) {
         return ZZECODE_NO_INIT;
     }
+    *sock = malloc(sizeof(udp_socket));
+    if (!*sock) {
+        return ZZECODE_OS_ERROR;
+    }
+    udp_socket *s = *sock;
 
 #ifdef _WIN32
     // create socket
-    sock->sock_ptr = malloc(sizeof(SOCKET));
-    *(SOCKET *)(sock->sock_ptr) = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (*(SOCKET*)(sock->sock_ptr) == INVALID_SOCKET) {
+    s->sock_ptr = malloc(sizeof(SOCKET));
+    *(SOCKET *)(s->sock_ptr) = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (*(SOCKET *)(s->sock_ptr) == INVALID_SOCKET) {
         printf("socket() failed\n");
         return ZZECODE_OS_ERROR;
     }
@@ -87,14 +114,14 @@ int zzmsg_create_socket(udp_socket *sock) {
         printf("socket() failed\n");
         return ZZECODE_OS_ERROR;
     }
-    sock->sock_ptr = (void *)psock;
+    s->sock_ptr = (void *)psock;
 #endif
 
     return ZZECODE_OK;
 }
 
 /* Bind socket */
-int zzmsg_bind_socket(udp_socket sock, u16 port, ip_address *local_ip) {
+int zzmsg_bind_socket(const udp_socket *sock, u16 port, ip_addr *local_ip) {
     int ret;
     if (check_init()) {
         return ZZECODE_NO_INIT;
@@ -121,7 +148,7 @@ int zzmsg_bind_socket(udp_socket sock, u16 port, ip_address *local_ip) {
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons(port);
 
-    ret = bind(*(SOCKET *)(sock.sock_ptr), (SOCKADDR *)&addr, sizeof(SOCKADDR_IN));
+    ret = bind(*(SOCKET *)(sock->sock_ptr), (SOCKADDR *)&addr, sizeof(SOCKADDR_IN));
     if (ret == SOCKET_ERROR) {
         printf("bind() failed, code %d\n", ret);
         return ZZECODE_OS_ERROR;
@@ -135,7 +162,7 @@ int zzmsg_bind_socket(udp_socket sock, u16 port, ip_address *local_ip) {
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons(port);
 
-    ret = bind(*(int *)(sock.sock_ptr), (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
+    ret = bind(*(int *)(sock->sock_ptr), (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
     if (ret) {
         printf("bind() failed, code %d\n", ret);
         return ZZECODE_OS_ERROR;
@@ -147,7 +174,7 @@ int zzmsg_bind_socket(udp_socket sock, u16 port, ip_address *local_ip) {
 }
 
 /* join multicast group */
-int zzmsg_join_multicast_group(udp_socket sock, ip_address group) {
+int zzmsg_join_multicast_group(const udp_socket *sock, ip_addr group) {
     int ret;
     if (check_init()) {
         return ZZECODE_NO_INIT;
@@ -157,7 +184,7 @@ int zzmsg_join_multicast_group(udp_socket sock, ip_address group) {
     struct ip_mreq mreq;
     mreq.imr_multiaddr = ipconv_zz2win(group.a, group.b, group.c, group.d);
     mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-    ret = setsockopt(*(SOCKET *)(sock.sock_ptr), IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&mreq, sizeof(mreq));
+    ret = setsockopt(*(SOCKET *)(sock->sock_ptr), IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&mreq, sizeof(mreq));
     if (ret) {
         printf("setsockopt() failed, code %d\n", ret);
         return ZZECODE_OS_ERROR;
@@ -168,7 +195,7 @@ int zzmsg_join_multicast_group(udp_socket sock, ip_address group) {
     struct ip_mreq mreq;
     mreq.imr_multiaddr.s_addr = ipconv_zz2unix(group.a, group.b, group.c, group.d);
     mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-    ret = setsockopt(*(int *)(sock.sock_ptr), IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&mreq, sizeof(mreq));
+    ret = setsockopt(*(int *)(sock->sock_ptr), IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&mreq, sizeof(mreq));
     if (ret) {
         printf("setsockopt() failed, code %d\n", ret);
         return ZZECODE_OS_ERROR;
@@ -180,7 +207,7 @@ int zzmsg_join_multicast_group(udp_socket sock, ip_address group) {
 }
 
 /* Send udp message */
-int zzmsg_send_udp(udp_socket sock, udp_address addr, u8 *data, u32 len, ip_address *local_ip) {
+int zzmsg_send_udp(const udp_socket *sock, udp_addr addr, const u8 *data, u32 len, ip_addr *local_ip) {
     int ret;
     if (check_init()) {
         return ZZECODE_NO_INIT;
@@ -196,7 +223,7 @@ int zzmsg_send_udp(udp_socket sock, udp_address addr, u8 *data, u32 len, ip_addr
 
 #ifdef _WIN32
     SOCKADDR_IN dest = addrconv_zz2win(addr.ip.a, addr.ip.b, addr.ip.c, addr.ip.d, addr.port);
-    ret = sendto(*(SOCKET *)(sock.sock_ptr), data, len, 0, (SOCKADDR *)&dest, sizeof(SOCKADDR_IN));
+    ret = sendto(*(SOCKET *)(sock->sock_ptr), data, len, 0, (SOCKADDR *)&dest, sizeof(SOCKADDR_IN));
     if (ret == 0) {
         printf("sendto() failed\n");
         return ZZECODE_OS_ERROR;
@@ -205,7 +232,7 @@ int zzmsg_send_udp(udp_socket sock, udp_address addr, u8 *data, u32 len, ip_addr
 
 #ifdef _UNIX
     struct sockaddr_in dest = addrconv_zz2unix(addr.ip.a, addr.ip.b, addr.ip.c, addr.ip.d, addr.port);
-    ret = sendto(*(int *)(sock.sock_ptr), data, len, 0, (struct sockaddr *)&dest, sizeof(struct sockaddr_in));
+    ret = sendto(*(int *)(sock->sock_ptr), data, len, 0, (struct sockaddr *)&dest, sizeof(struct sockaddr_in));
     if (ret == 0) {
         printf("sendto() failed\n");
         return ZZECODE_OS_ERROR;
@@ -216,7 +243,7 @@ int zzmsg_send_udp(udp_socket sock, udp_address addr, u8 *data, u32 len, ip_addr
 }
 
 /* Receive udp message */
-int zzmsg_recv_udp(udp_socket sock, udp_address *addr, u8 *buf, u32 len, u32 *receive_len) {
+int zzmsg_recv_udp(const udp_socket *sock, udp_addr *addr, u8 *buf, u32 len, u32 *receive_len) {
     if (check_init()) {
         return ZZECODE_NO_INIT;
     }
@@ -225,7 +252,7 @@ int zzmsg_recv_udp(udp_socket sock, udp_address *addr, u8 *buf, u32 len, u32 *re
     SOCKADDR_IN from;
     int from_len = sizeof(SOCKADDR_IN);
 
-    int bytes_received = recvfrom(*(SOCKET *)(sock.sock_ptr), buf, len - 1, 0, (SOCKADDR *)&from, &from_len);
+    int bytes_received = recvfrom(*(SOCKET *)(sock->sock_ptr), buf, len - 1, 0, (SOCKADDR *)&from, &from_len);
     if (bytes_received <= 0) {
         printf("recvfrom() failed\n");
         return ZZECODE_OS_ERROR;
@@ -243,7 +270,7 @@ int zzmsg_recv_udp(udp_socket sock, udp_address *addr, u8 *buf, u32 len, u32 *re
 #ifdef _UNIX
     struct sockaddr_in from;
     int from_len = sizeof(struct sockaddr_in);
-    int bytes_received = recvfrom(*(int *)(sock.sock_ptr), buf, len - 1, 0, (struct sockaddr *)&from, &from_len);
+    int bytes_received = recvfrom(*(int *)(sock->sock_ptr), buf, len - 1, 0, (struct sockaddr *)&from, &from_len);
     if (bytes_received <= 0) {
         printf("recvfrom() failed\n");
         return ZZECODE_OS_ERROR;
@@ -261,19 +288,21 @@ int zzmsg_recv_udp(udp_socket sock, udp_address *addr, u8 *buf, u32 len, u32 *re
     return ZZECODE_OK;
 }
 
-int zzmsg_close_socket(udp_socket sock) {
+int zzmsg_close_socket(udp_socket *sock) {
     if (check_init()) {
         return ZZECODE_NO_INIT;
     }
 
 #ifdef _WIN32
-    closesocket(*(SOCKET *)(sock.sock_ptr));
-    free(sock.sock_ptr);
+    closesocket(*(SOCKET *)(sock->sock_ptr));
+    free(sock->sock_ptr);
+    sock->sock_ptr = NULL;
 #endif
 
 #ifdef _UNIX
-    close(*(int *)(sock.sock_ptr));
-    free(sock.sock_ptr);
+    close(*(int *)(sock->sock_ptr));
+    free(sock->sock_ptr);
+    sock->sock_ptr = NULL;
 #endif
 
     return ZZECODE_OK;
@@ -312,7 +341,7 @@ int zzmsg_get_all_interfaces(adapter_info **ifs, u32 *count) {
         if (p->PhysicalAddressLength == 6) {
             (*ifs)[i].mac = addrconv_win2mac(p->PhysicalAddress);
         } else {
-            (*ifs)[i].mac = (mac_address){0, {0}};
+            (*ifs)[i].mac = (mac_addr){0, {0}};
         }
         char **ip_list = NULL;
 
@@ -336,7 +365,7 @@ int zzmsg_get_all_interfaces(adapter_info **ifs, u32 *count) {
             pUnicast = pUnicast->Next;
         }
 
-        (*ifs)[i].ip = (ip_address *)malloc(ip_count * sizeof(ip_address));
+        (*ifs)[i].ip = (ip_addr *)malloc(ip_count * sizeof(ip_addr));
         for (int j = 0; j < ip_count; j++) {
             (*ifs)[i].ip[j] = addrconv_str2ip(ip_list[j]);
             free(ip_list[j]);
@@ -365,7 +394,7 @@ int zzmsg_get_all_interfaces(adapter_info **ifs, u32 *count) {
     int mapIfIndex[100];
     char **ifname_list = (char **)malloc(100 * sizeof(char *));
     ip_address *ip_list = (ip_address *)malloc(100 * sizeof(ip_address));
-    mac_address *mac_list = (mac_address *)malloc(100 * sizeof(mac_address));
+    mac_addr *mac_list = (mac_addr *)malloc(100 * sizeof(mac_addr));
     memset(mapIfIndex, -1, sizeof(mapIfIndex));
 
     for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
@@ -453,6 +482,18 @@ int zzmsg_get_all_interfaces(adapter_info **ifs, u32 *count) {
     return ZZECODE_OK;
 }
 
+char *zzmsg_ip2str(ip_addr ip) {
+    static char buf[16];
+    sprintf(buf, "%d.%d.%d.%d", ip.a, ip.b, ip.c, ip.d);
+    return buf;
+}
+
+char *zzmsg_udp2str(udp_addr addr) {
+    static char buf[32];
+    sprintf(buf, "%s:%d", zzmsg_ip2str(addr.ip), addr.port);
+    return buf;
+}
+
 /* SECTION platform-specific functions */
 
 #ifdef _WIN32
@@ -482,8 +523,8 @@ SOCKADDR_IN addrconv_zz2win(u8 a, u8 b, u8 c, u8 d, u16 port) {
     return addr;
 }
 
-udp_address addrconv_win2zz(SOCKADDR_IN addr) {
-    udp_address zzaddr;
+udp_addr addrconv_win2zz(SOCKADDR_IN addr) {
+    udp_addr zzaddr;
     zzaddr.ip.a = addr.sin_addr.S_un.S_un_b.s_b1;
     zzaddr.ip.b = addr.sin_addr.S_un.S_un_b.s_b2;
     zzaddr.ip.c = addr.sin_addr.S_un.S_un_b.s_b3;
@@ -492,8 +533,8 @@ udp_address addrconv_win2zz(SOCKADDR_IN addr) {
     return zzaddr;
 }
 
-mac_address addrconv_win2mac(u8 *mac) {
-    mac_address zzmac;
+mac_addr addrconv_win2mac(u8 *mac) {
+    mac_addr zzmac;
     for (int i = 0; i < 6; ++i) {
         zzmac.addr[i] = mac[i];
     }
@@ -517,8 +558,8 @@ struct sockaddr_in addrconv_zz2unix(u8 a, u8 b, u8 c, u8 d, u16 port) {
     return addr;
 }
 
-udp_address addrconv_unix2zz(struct sockaddr_in addr) {
-    udp_address zzaddr;
+udp_addr addrconv_unix2zz(struct sockaddr_in addr) {
+    udp_addr zzaddr;
     zzaddr.ip.a = addr.sin_addr.s_addr >> 24;
     zzaddr.ip.b = addr.sin_addr.s_addr >> 16;
     zzaddr.ip.c = addr.sin_addr.s_addr >> 8;
@@ -527,17 +568,17 @@ udp_address addrconv_unix2zz(struct sockaddr_in addr) {
     return zzaddr;
 }
 
-mac_address macconv_unix2zz(struct sockaddr_ll *addr) {
-    mac_address zzmac;
+mac_addr macconv_unix2zz(struct sockaddr_ll *addr) {
+    mac_addr zzmac;
     for (int i = 0; i < addr->sll_halen; ++i) {
         zzmac.addr[i] = addr->sll_addr[i];
     }
     return zzmac;
 }
 
-ip_address ipconv_unix2zz(struct sockaddr_in *addr) {
+ip_addr ipconv_unix2zz(struct sockaddr_in *addr) {
     u32 ip = addr->sin_addr.s_addr;
-    ip_address zzip;
+    ip_addr zzip;
     zzip.a = ip;
     zzip.b = ip >> 8;
     zzip.c = ip >> 16;
@@ -547,8 +588,8 @@ ip_address ipconv_unix2zz(struct sockaddr_in *addr) {
 
 #endif
 
-ip_address addrconv_str2ip(char *str) {
-    ip_address ip;
+ip_addr addrconv_str2ip(char *str) {
+    ip_addr ip;
     sscanf(str, "%hhu.%hhu.%hhu.%hhu", &ip.a, &ip.b, &ip.c, &ip.d);
     return ip;
 }
@@ -563,13 +604,13 @@ int check_init() {
     return 0;
 }
 
-int set_socket_reusable(udp_socket sock) {
+int set_socket_reusable(const udp_socket *sock) {
     if (check_init()) {
         return ZZECODE_NO_INIT;
     }
 #ifdef _WIN32
     int ret = 0;
-    setsockopt(*(SOCKET *)(sock.sock_ptr), SOL_SOCKET, SO_REUSEADDR, (char *)&ret, sizeof(ret));
+    setsockopt(*(SOCKET *)(sock->sock_ptr), SOL_SOCKET, SO_REUSEADDR, (char *)&ret, sizeof(ret));
     if (ret) {
         printf("setsockopt(reusable) failed, code %d\n", ret);
         return ZZECODE_OS_ERROR;
@@ -578,8 +619,8 @@ int set_socket_reusable(udp_socket sock) {
 
 #ifdef _UNIX
     int ret = 0;
-    int *psock = (int *)sock.sock_ptr;
-    setsockopt(*(int *)(sock.sock_ptr), SOL_SOCKET, SO_REUSEADDR, (char *)&ret, sizeof(ret));
+    int *psock = (int *)sock->sock_ptr;
+    setsockopt(*(int *)(sock->sock_ptr), SOL_SOCKET, SO_REUSEADDR, (char *)&ret, sizeof(ret));
     if (ret) {
         printf("setsockopt(reusable) failed, code %d\n", ret);
         return ZZECODE_OS_ERROR;
@@ -590,14 +631,14 @@ int set_socket_reusable(udp_socket sock) {
     return ZZECODE_OK;
 }
 
-int set_socket_if(udp_socket sock, ip_address ip) {
+int set_socket_if(const udp_socket *sock, ip_addr ip) {
     int ret;
     if (check_init()) {
         return ZZECODE_NO_INIT;
     }
 #ifdef _WIN32
     IN_ADDR addr = ipconv_zz2win(ip.a, ip.b, ip.c, ip.d);
-    ret = setsockopt(*(SOCKET *)(sock.sock_ptr), IPPROTO_IP, IP_MULTICAST_IF, (const char *)&addr, sizeof(addr));
+    ret = setsockopt(*(SOCKET *)(sock->sock_ptr), IPPROTO_IP, IP_MULTICAST_IF, (const char *)&addr, sizeof(addr));
     if (ret) {
         printf("setsockopt(if) failed, code %d\n", ret);
         return ZZECODE_OS_ERROR;
@@ -605,9 +646,9 @@ int set_socket_if(udp_socket sock, ip_address ip) {
 #endif
 
 #ifdef _UNIX
-    int *psock = (int *)sock.sock_ptr;
+    int *psock = (int *)sock->sock_ptr;
     in_addr_t addr = ipconv_zz2unix(ip.a, ip.b, ip.c, ip.d);
-    ret = setsockopt(*(int *)(sock.sock_ptr), IPPROTO_IP, IP_MULTICAST_IF, (const char *)&addr, sizeof(addr));
+    ret = setsockopt(*(int *)(sock->sock_ptr), IPPROTO_IP, IP_MULTICAST_IF, (const char *)&addr, sizeof(addr));
     if (ret) {
         printf("setsockopt(if) failed, code %d\n", ret);
         return ZZECODE_OS_ERROR;
