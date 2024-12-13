@@ -6,17 +6,23 @@
 #include <zzutil/errmsg.h>
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <stdbool.h>
 
-#include <skf.h>
+#ifdef _UNIX
+#include <unistd.h>
+#include <dlfcn.h>
+#endif
 
+#include <skf.h>
 
 /************************************************************
  * Declears
  ************************************************************/
 
-typedef struct _zzcrypt_devhandle dev_t;
-typedef struct _zzcrypt_keyhandle key_t;
+typedef struct _zzcrypt_devhandle hdev_t;
+typedef struct _zzcrypt_keyhandle hkey_t;
 typedef struct _zzcrypt_apphandle app_t;
 typedef struct _zzcrypt_ctnhandle ctn_t;
 typedef struct _zzcrypt_cipherp_param cparam_t;
@@ -65,13 +71,13 @@ struct _zzcrypt_ctnhandle {
     bool is_initialized;
 };
 
-int zzcrypt_init(dev_t **hdev, FILE *log) {
+int zzcrypt_init(hdev_t **hdev, FILE *log) {
     int ret;
     u8 devices[128] = {0};
     u8 app_name_buf[128];
     u32 devices_size = sizeof(devices);
 
-    dev_t *h = malloc(sizeof(dev_t));
+    hdev_t *h = malloc(sizeof(hdev_t));
     h->is_initialized = false;
     *hdev = h;
 
@@ -91,7 +97,6 @@ int zzcrypt_init(dev_t **hdev, FILE *log) {
     if (skf_error("SKF_EnumDev", ret)) {
         return ZZECODE_SKF_ERR;
     }
-
 
     /* connect device */
     ret = FunctionList->SKF_ConnectDev(devices, &h->skf_handle);
@@ -123,9 +128,9 @@ int zzcrypt_init(dev_t **hdev, FILE *log) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_init_app(const dev_t * hdev, const char * app_name, const char *pin, app_t ** happ) {
+int zzcrypt_init_app(const hdev_t *hdev, const char *app_name, const char *pin, app_t **happ) {
     int ret;
-    
+
     if (!hdev->is_initialized) {
         return ZZECODE_NO_INIT;
     }
@@ -146,22 +151,22 @@ int zzcrypt_init_app(const dev_t * hdev, const char * app_name, const char *pin,
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm2_import_key(const dev_t *hdev, const app_t *happ, const uint8_t *prikey, const uint8_t *pubkey) {
+int zzcrypt_sm2_import_key(const hdev_t *hdev, const app_t *happ, const uint8_t *prikey, const uint8_t *pubkey) {
 
     /**
-    *how to import sm2 keypair:
-    *1\prepare sm2 keypair into buf
-    *2\prepare the struct PENVELOPEDKEYBLOB :env
-    *3\get the pubkey form ukey, copy pubkey to env
-    *4\use sm1 algo encrypt prikey and then copy to env.cbEncryptedPriKey
-    *5\use sm2 pubkey encrypt sm1 key ,and then copy to env.ECCCipherBlob
-    *6\call SKF_ImportECCKeyPair
-    */
+     *how to import sm2 keypair:
+     *1\prepare sm2 keypair into buf
+     *2\prepare the struct PENVELOPEDKEYBLOB :env
+     *3\get the pubkey form ukey, copy pubkey to env
+     *4\use sm1 algo encrypt prikey and then copy to env.cbEncryptedPriKey
+     *5\use sm2 pubkey encrypt sm1 key ,and then copy to env.ECCCipherBlob
+     *6\call SKF_ImportECCKeyPair
+     */
 
     int ret;
 
     HCONTAINER hctn = NULL;
-    
+
     // 1. create conatiner
     ret = FunctionList->SKF_CreateContainer(happ->skf_handle, "ZZSM2", &hctn);
     if (ret) { // may exist
@@ -206,7 +211,7 @@ int zzcrypt_sm2_import_key(const dev_t *hdev, const app_t *happ, const uint8_t *
     env_blob->PubKey.BitLen = 256;
     memcpy(env_blob->PubKey.XCoordinate + 32, pubkey, 32);
     memcpy(env_blob->PubKey.YCoordinate + 32, pubkey + 32, 32);
-    u8 key[16] = {0x47,0x50,0x42,0x02,0x20,0x3F,0xE1,0x92,0x66,0x2A,0xCB,0xD2,0x9D,0x11,0x22,0x33};
+    u8 key[16] = {0x47, 0x50, 0x42, 0x02, 0x20, 0x3F, 0xE1, 0x92, 0x66, 0x2A, 0xCB, 0xD2, 0x9D, 0x11, 0x22, 0x33};
     HANDLE hkey = NULL;
     ret = FunctionList->SKF_SetSymmKey(hdev->skf_handle, key, SGD_SM1_ECB, &hkey);
     if (skf_error("SKF_SetSymmKey", ret)) {
@@ -245,7 +250,7 @@ int zzcrypt_sm2_import_key(const dev_t *hdev, const app_t *happ, const uint8_t *
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm2_encrypt(const dev_t *hdev, const uint8_t *pubkey, const uint8_t *data, size_t len, uint8_t **enc_data, size_t *enc_len) {
+int zzcrypt_sm2_encrypt(const hdev_t *hdev, const uint8_t *pubkey, const uint8_t *data, size_t len, uint8_t **enc_data, size_t *enc_len) {
     int ret;
     if (!hdev->is_initialized) {
         return ZZECODE_CRYPO_NO_INIT;
@@ -277,7 +282,7 @@ int zzcrypt_sm2_encrypt(const dev_t *hdev, const uint8_t *pubkey, const uint8_t 
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm2_decrypt(const dev_t *hdev, const uint8_t *prikey, const uint8_t *enc_data, size_t enc_len, uint8_t **data, size_t *len) {
+int zzcrypt_sm2_decrypt(const hdev_t *hdev, const uint8_t *prikey, const uint8_t *enc_data, size_t enc_len, uint8_t **data, size_t *len) {
     int ret;
 
     if (!hdev->is_initialized) {
@@ -310,10 +315,10 @@ int zzcrypt_sm2_decrypt(const dev_t *hdev, const uint8_t *prikey, const uint8_t 
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_import_key(const dev_t *hdev, const uint8_t *key, key_t **hkey) {
+int zzcrypt_sm4_import_key(const hdev_t *hdev, const uint8_t *key, hkey_t **hkey) {
     int ret;
 
-    key_t *h = malloc(sizeof(key_t));
+    hkey_t *h = malloc(sizeof(hkey_t));
     h->is_initialized = false;
     *hkey = h;
     ret = FunctionList->SKF_SetSymmKey(hdev->skf_handle, (u8 *)key, SGD_SMS4_ECB, &h->skf_handle);
@@ -324,7 +329,7 @@ int zzcrypt_sm4_import_key(const dev_t *hdev, const uint8_t *key, key_t **hkey) 
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_encrypt_init(key_t *hkey, cparam_t param) {
+int zzcrypt_sm4_encrypt_init(hkey_t *hkey, cparam_t param) {
     int ret;
 
     if (hkey->is_initialized) {
@@ -347,7 +352,7 @@ int zzcrypt_sm4_encrypt_init(key_t *hkey, cparam_t param) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_encrypt_push(key_t *hkey, const uint8_t *data, size_t len) {
+int zzcrypt_sm4_encrypt_push(hkey_t *hkey, const uint8_t *data, size_t len) {
     int ret;
 
     if (!hkey->is_initialized) {
@@ -395,7 +400,7 @@ int zzcrypt_sm4_encrypt_push(key_t *hkey, const uint8_t *data, size_t len) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_encrypt_peek(const key_t *hkey, uint8_t **enc_data, size_t *enc_len) {
+int zzcrypt_sm4_encrypt_peek(const hkey_t *hkey, uint8_t **enc_data, size_t *enc_len) {
     if (!hkey->is_initialized) {
         return ZZECODE_CRYPO_NO_INIT;
     }
@@ -407,7 +412,7 @@ int zzcrypt_sm4_encrypt_peek(const key_t *hkey, uint8_t **enc_data, size_t *enc_
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_encrypt_pop(key_t *hkey, uint8_t **enc_data, size_t *enc_len) {
+int zzcrypt_sm4_encrypt_pop(hkey_t *hkey, uint8_t **enc_data, size_t *enc_len) {
     int ret;
 
     if (!hkey->is_initialized) {
@@ -432,7 +437,7 @@ int zzcrypt_sm4_encrypt_pop(key_t *hkey, uint8_t **enc_data, size_t *enc_len) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_decrypt_init(key_t *hkey, cparam_t param) {
+int zzcrypt_sm4_decrypt_init(hkey_t *hkey, cparam_t param) {
     int ret;
 
     if (hkey->is_initialized) {
@@ -455,7 +460,7 @@ int zzcrypt_sm4_decrypt_init(key_t *hkey, cparam_t param) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_decrypt_push(key_t *hkey, const uint8_t *data, size_t len) {
+int zzcrypt_sm4_decrypt_push(hkey_t *hkey, const uint8_t *data, size_t len) {
     int ret;
 
     if (!hkey->is_initialized) {
@@ -502,7 +507,7 @@ int zzcrypt_sm4_decrypt_push(key_t *hkey, const uint8_t *data, size_t len) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_decrypt_peek(const key_t *hkey, uint8_t **enc_data, size_t *enc_len) {
+int zzcrypt_sm4_decrypt_peek(const hkey_t *hkey, uint8_t **enc_data, size_t *enc_len) {
     if (!hkey->is_initialized) {
         return ZZECODE_CRYPO_NO_INIT;
     }
@@ -514,7 +519,7 @@ int zzcrypt_sm4_decrypt_peek(const key_t *hkey, uint8_t **enc_data, size_t *enc_
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_decrypt_pop(key_t *hkey, uint8_t **enc_data, size_t *enc_len) {
+int zzcrypt_sm4_decrypt_pop(hkey_t *hkey, uint8_t **enc_data, size_t *enc_len) {
     int ret;
 
     if (!hkey->is_initialized) {
@@ -667,22 +672,22 @@ BLOCKCIPHERPARAM gen_block_cipher_param(const cparam_t *param) {
         p.PaddingType = PKCS5_PADDING;
         break;
     case zzcrypt_padding_zero:
-        // use padding implementation of skf library
-        p.PaddingType = ZERO_PADDING;
+        // TODO - use padding implementation of our own
+        p.PaddingType = NO_PADDING;
         break;
     case zzcrypt_padding_pkcs7:
-        // use padding implementation of our own
-        p.PaddingType = 0;
+        // TODO - use padding implementation of our own
+        p.PaddingType = NO_PADDING;
         break;
     case zzcrypt_padding_none:
     default:
-        p.PaddingType = 0;
+        p.PaddingType = NO_PADDING;
         break;
     }
 
     return p;
 }
- 
+
 bool read_key_from_hex_string(const char *str, u8 **key, size_t *key_len) {
     zzhex_hex_to_bin(str, key, key_len);
 }

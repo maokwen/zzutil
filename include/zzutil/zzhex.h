@@ -1,6 +1,7 @@
 #ifndef ZZUTIL_ZZHEX_H
 #define ZZUTIL_ZZHEX_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 int zzhex_base64_encode(char *hex, size_t len, char **base64);

@@ -11,7 +11,8 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
-#elif _UNIX
+#endif
+#ifdef _UNIX
 #ifndef __USE_MISC
 #define __USE_MISC
 #endif
@@ -59,11 +60,11 @@ static in_addr_t ipconv_zz2unix(u8 a, u8 b, u8 c, u8 d);
 static struct sockaddr_in addrconv_zz2unix(u8 a, u8 b, u8 c, u8 d, u16 port);
 static udp_addr addrconv_unix2zz(struct sockaddr_in addr);
 static mac_addr macconv_unix2zz(struct sockaddr_ll *addr);
-static ip_address ipconv_unix2zz(struct sockaddr_in *addr);
+static ip_addr ipconv_unix2zz(struct sockaddr_in *addr);
 #endif
 
 static int zzmsg_is_initilized = 0;
-/* convert ip address string to ip_address */
+/* convert ip address string to ip_addr */
 static ip_addr addrconv_str2ip(char *);
 /* check if initialized */
 static int check_init();
@@ -393,7 +394,7 @@ int zzmsg_get_all_interfaces(adapter_info **ifs, u32 *count) {
     int ifname_count = 0;
     int mapIfIndex[100];
     char **ifname_list = (char **)malloc(100 * sizeof(char *));
-    ip_address *ip_list = (ip_address *)malloc(100 * sizeof(ip_address));
+    ip_addr *ip_list = (ip_addr *)malloc(100 * sizeof(ip_addr));
     mac_addr *mac_list = (mac_addr *)malloc(100 * sizeof(mac_addr));
     memset(mapIfIndex, -1, sizeof(mapIfIndex));
 
@@ -462,7 +463,7 @@ int zzmsg_get_all_interfaces(adapter_info **ifs, u32 *count) {
             continue;
         } else if (real_idx == i) {
             int ip_index = ifCountMap[real_idx];
-            (*ifs)[real_idx].ip = (ip_address *)malloc((*ifs)[real_idx].ip_count * sizeof(ip_address));
+            (*ifs)[real_idx].ip = (ip_addr *)malloc((*ifs)[real_idx].ip_count * sizeof(ip_addr));
             (*ifs)[real_idx].ip[ip_index] = ip_list[i];
             ifCountMap[real_idx] += 1;
         } else {

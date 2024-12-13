@@ -1,0 +1,26 @@
+libskf-amd64.so:
+    - version unknown
+    - glibc version 2.2.5
+    - gcc 4.1.2
+    - unknown
+libskf-x86_64.so:
+    - version 6.21.1214
+    - glibc version 2.2.5
+    - gcc 4.4.5
+    - libSKF_ms_x86_64_1.6.21.1214
+libskf-x86_32.so:
+    - version 1.6.22.0118
+    - glibc version 2.2.5
+    - gcc 4.1.2
+    - libSKF_ms_x86_32_1.6.22.0118
+libskf-arm64.so:
+    - version 1.6.21.1118
+    - glibc 2.17
+    - linaro gcc 7.2.1
+    - libSKF_ms_gcc-linaro-7.2.1-2017.11-x86_64_aarch64-linux-gnu_1.6.21.1118
+skf-x86_32.dll:
+    - version 1.7.22.0117
+    - SKF_ukey_i686_1.7.22.0117.dll:
+skf-x86_64.dll:
+    - version 1.7.22.0117
+    - SKF_ukey_x86_64_1.7.22.0117.dll:
