@@ -16,6 +16,7 @@ typedef uint32_t u32;
 typedef uint64_t u64;
 
 void test_sm4_ecb(zzcrypt_devhandle_p hdev) {
+    printf("=====test_sm4_ecb\n");
     int ret;
     u8 key[16] = {
         0x77, 0x7f, 0x23, 0xc6, 0xfe, 0x7b, 0x48, 0x73, 0xdd, 0x59, 0x5c, 0xff, 0xf6, 0x5f, 0x58, 0xec};
@@ -71,10 +72,13 @@ void test_sm4_ecb(zzcrypt_devhandle_p hdev) {
 
     assert(memcmp(enc_data_expect, enc_data, 16) == 0);
     assert(memcmp(data, dec_data, 16) == 0);
+
+    zzcrypt_sm4_release(hkey);
     printf("=====test_sm4_ecb passed\n");
 }
 
 void test_sm4_ecb_padding(zzcrypt_devhandle_p hdev) {
+    printf("=====test_sm4_ecb_padding\n");
     int ret;
     u8 key[] = {0x77, 0x7f, 0x23, 0xc6, 0xfe, 0x7b, 0x48, 0x73, 0xdd, 0x59, 0x5c, 0xff, 0xf6, 0x5f, 0x58, 0xec};
     u8 data[] = {0x11, 0x22, 0x33}; // 1122330d0d0d0d0d0d0d0d0d0d0d0d0d
@@ -127,13 +131,16 @@ void test_sm4_ecb_padding(zzcrypt_devhandle_p hdev) {
 
     assert(memcmp(enc_data_expect, enc_data, 16) == 0);
     assert(memcmp(data, dec_data, dec_len) == 0);
+
+    zzcrypt_sm4_release(hkey);
     printf("=====test_sm4_ecb_padding passed\n");
 }
 
 void test_sm4_ecb_padding_zero(zzcrypt_devhandle_p hdev) {
+    printf("=====test_sm4_ecb_padding_zero\n");
     u8 key[] = {0x77, 0x7f, 0x23, 0xc6, 0xfe, 0x7b, 0x48, 0x73, 0xdd, 0x59, 0x5c, 0xff, 0xf6, 0x5f, 0x58, 0xec};
-    u8 data[] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99}; // 11223344556677889907070707070707
-    u8 enc_data_expect[] = {0xA3, 0x5C, 0xC2, 0xB1, 0x54, 0xD6, 0xE8, 0xAB, 0x9D, 0x7C, 0xA6, 0xB9, 0xC3, 0x76, 0x7D, 0x0C};
+    u8 data[] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77}; // 11223344556677
+    u8 enc_data_expect[] = {0x33, 0x55, 0xcd, 0x38, 0x97, 0x7a, 0xdb, 0xc8, 0x8a, 0x46, 0xee, 0xf4, 0xfd, 0x6d, 0x71, 0xb4};
 
     zzcrypt_keyhandle_p hkey;
     int ret = zzcrypt_sm4_import_key(hdev, key, &hkey);
@@ -147,9 +154,9 @@ void test_sm4_ecb_padding_zero(zzcrypt_devhandle_p hdev) {
     ret = zzcrypt_sm4_encrypt_init(hkey, param);
     assert(ret == ZZECODE_OK);
 
-    zzhex_print_data_hex("     uncrypted data", data, 16);
+    zzhex_print_data_hex("     uncrypted data", data, 7);
 
-    ret = zzcrypt_sm4_encrypt_push(hkey, data, 9);
+    ret = zzcrypt_sm4_encrypt_push(hkey, data, 7);
     assert(ret == ZZECODE_OK);
 
     u8 *enc_data;
@@ -162,6 +169,8 @@ void test_sm4_ecb_padding_zero(zzcrypt_devhandle_p hdev) {
     ret = zzcrypt_sm4_encrypt_pop(hkey, &enc_data, &enc_len);
     assert(ret == ZZECODE_OK);
     zzhex_print_data_hex("pop  encrypted data", enc_data, enc_len);
+
+    assert(memcmp(enc_data_expect, enc_data, 16) == 0);
 
     ret = zzcrypt_sm4_decrypt_init(hkey, param);
     assert(ret == ZZECODE_OK);
@@ -180,12 +189,15 @@ void test_sm4_ecb_padding_zero(zzcrypt_devhandle_p hdev) {
     assert(ret == ZZECODE_OK);
     zzhex_print_data_hex("pop  decrypted data", dec_data, dec_len);
 
-    assert(memcmp(enc_data_expect, enc_data, 16) == 0);
-    assert(memcmp(data, dec_data, dec_len) == 0);
+    assert(dec_len == 7);
+    assert(memcmp(data, dec_data, 7) == 0);
+
+    zzcrypt_sm4_release(hkey);
     printf("=====test_sm4_ecb_padding2 passed\n");
 }
 
 void test_sm4_ecb_padding_pkcs5(zzcrypt_devhandle_p hdev) {
+    printf("=====test_sm4_ecb_padding_pkcs5\n");
     int ret = 0;
     u8 key[] = {0x77, 0x7f, 0x23, 0xc6, 0xfe, 0x7b, 0x48, 0x73, 0xdd, 0x59, 0x5c, 0xff, 0xf6, 0x5f, 0x58, 0xec};
     u8 data[] = {0x5f, 0xe9, 0x7c, 0xcd, 0x58, 0xfe, 0xd7, 0xab, 0x41, 0xf7, 0x1e, 0xfb, 0xfd, 0xe7, 0xe1, 0x46};
@@ -237,12 +249,15 @@ void test_sm4_ecb_padding_pkcs5(zzcrypt_devhandle_p hdev) {
     assert(ret == ZZECODE_OK);
     zzhex_print_data_hex("pop  decrypted data", dec_data, dec_len);
 
+    zzcrypt_sm4_release(hkey);
+
     assert(memcmp(result, enc_data, enc_len) == 0);
     assert(memcmp(data, dec_data, 16) == 0);
     printf("=====test_sm4_ecb_pkcs5 passed\n");
 }
 
 void test_sm4_cbc(zzcrypt_devhandle_p hdev) {
+    printf("=====test_sm4_cbc\n");
     int ret = 0;
     u8 key[] = {0x77, 0x7f, 0x23, 0xc6, 0xfe, 0x7b, 0x48, 0x73, 0xdd, 0x59, 0x5c, 0xff, 0xf6, 0x5f, 0x58, 0xec};
     u8 data[] = {0x5f, 0xe9, 0x7c, 0xcd, 0x58, 0xfe, 0xd7, 0xab, 0x41, 0xf7, 0x1e, 0xfb, 0xfd, 0xe7, 0xe1, 0x46};
@@ -296,17 +311,20 @@ void test_sm4_cbc(zzcrypt_devhandle_p hdev) {
 
     assert(memcmp(result, enc_data, enc_len) == 0);
     assert(memcmp(data, dec_data, 16) == 0);
+
+    zzcrypt_sm4_release(hkey);
     printf("=====test_sm4_cbc passed\n");
 }
 
 void test_sm4_ecb_17(zzcrypt_devhandle_p hdev) {
+    printf("=====test_sm4_ecb_17\n");
     int ret;
     u8 key[16] = {
         0x77, 0x7f, 0x23, 0xc6, 0xfe, 0x7b, 0x48, 0x73, 0xdd, 0x59, 0x5c, 0xff, 0xf6, 0x5f, 0x58, 0xec};
     u8 data[17] = {
         0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x99};
     u8 enc_data_expect[] = {
-        0x56, 0xda, 0x23, 0xe2, 0x5f, 0xa7, 0xcd, 0x82, 0x5d, 0x51, 0xc2, 0x20, 0xf5, 0x98, 0x09, 0x0b};
+        0x20, 0x9d, 0x1e, 0xcc, 0x72, 0xbf, 0xea, 0x0e, 0x0e, 0xc2, 0x9a, 0xd8, 0xc5, 0xf4, 0x3d, 0xfe, 0xe6, 0xa6, 0x0d, 0x1c, 0x59, 0x45, 0x63, 0xc4, 0x35, 0xd4, 0xe4, 0x95, 0x71, 0x49, 0x35, 0xce};
 
     zzcrypt_keyhandle_p hkey;
     ret = zzcrypt_sm4_import_key(hdev, key, &hkey);
@@ -316,14 +334,14 @@ void test_sm4_ecb_17(zzcrypt_devhandle_p hdev) {
     param.algorithm = zzcrypt_algorithm_sm4ecb;
     param.iv = NULL;
     param.iv_len = 0;
-    param.padding_type = zzcrypt_padding_none;
+    param.padding_type = zzcrypt_padding_zero;
     ret = zzcrypt_sm4_encrypt_init(hkey, param);
     assert(ret == ZZECODE_OK);
 
-    zzhex_print_data_hex("     uncrypted data", data, 16);
+    zzhex_print_data_hex("     uncrypted data", data, 17);
 
     assert(ret == ZZECODE_OK);
-    ret = zzcrypt_sm4_encrypt_push(hkey, data, 16);
+    ret = zzcrypt_sm4_encrypt_push(hkey, data, 17);
 
     u8 *enc_data;
     size_t enc_len;
@@ -335,6 +353,8 @@ void test_sm4_ecb_17(zzcrypt_devhandle_p hdev) {
     ret = zzcrypt_sm4_encrypt_pop(hkey, &enc_data, &enc_len);
     assert(ret == ZZECODE_OK);
     zzhex_print_data_hex("pop  encrypted data", enc_data, enc_len);
+
+    assert(memcmp(enc_data_expect, enc_data, 32) == 0);
 
     ret = zzcrypt_sm4_decrypt_init(hkey, param);
     assert(ret == ZZECODE_OK);
@@ -353,12 +373,15 @@ void test_sm4_ecb_17(zzcrypt_devhandle_p hdev) {
     assert(ret == ZZECODE_OK);
     zzhex_print_data_hex("pop  decrypted data", dec_data, dec_len);
 
-    assert(memcmp(enc_data_expect, enc_data, 16) == 0);
-    assert(memcmp(data, dec_data, 16) == 0);
+    assert(dec_len == 17);
+    assert(memcmp(data, dec_data, 17) == 0);
+
+    zzcrypt_sm4_release(hkey);
     printf("=====test_sm4_ecb passed\n");
 }
 
 void test_sm4_ecb_long(zzcrypt_devhandle_p hdev) {
+    printf("=====test_sm4_ecb_long\n");
     int ret = 0;
     u8 key[] = {0x77, 0x7f, 0x23, 0xc6, 0xfe, 0x7b, 0x48, 0x73, 0xdd, 0x59, 0x5c, 0xff, 0xf6, 0x5f, 0x58, 0xec};
     u8 data[1024];
@@ -435,10 +458,12 @@ void test_sm4_ecb_long(zzcrypt_devhandle_p hdev) {
     free(dec_data);
     enc_data = NULL;
 
+    zzcrypt_sm4_release(hkey);
     printf("=====test_sm4_ecb_long passed\n");
 }
 
 void test_sm2(zzcrypt_devhandle_p hdev) {
+    printf("=====test_sm2\n");
     int ret = 0;
 
     u8 *pubkey, *prikey;
@@ -517,6 +542,7 @@ void test_sm2(zzcrypt_devhandle_p hdev) {
 }
 
 void test_sm2_from_hex(zzcrypt_devhandle_p hdev) {
+    printf("=====test_sm2_from_hex\n");
     int ret = 0;
 
     zzcrypt_apphandle_p happ = NULL;
@@ -552,6 +578,7 @@ void test_sm2_from_hex(zzcrypt_devhandle_p hdev) {
 }
 
 void test_sm2_long(zzcrypt_devhandle_p hdev) {
+    printf("=====test_sm2_long\n");
     int ret = 0;
 
     zzcrypt_apphandle_p happ = NULL;
@@ -585,12 +612,14 @@ void test_sm2_long(zzcrypt_devhandle_p hdev) {
     }
     u8 *enc_data;
     size_t enc_len;
-    zzcrypt_sm2_encrypt(hdev, pubkey, data, data_len, &enc_data, &enc_len);
+    ret = zzcrypt_sm2_encrypt(hdev, pubkey, data, data_len, &enc_data, &enc_len);
+    assert(ret == ZZECODE_OK);
     zzhex_print_data_hex("enc_data", enc_data, enc_len);
 
     u8 *dec_data;
     size_t dec_len;
-    zzcrypt_sm2_decrypt(hdev, prikey, enc_data, enc_len, &dec_data, &dec_len);
+    ret = zzcrypt_sm2_decrypt(hdev, prikey, enc_data, enc_len, &dec_data, &dec_len);
+    assert(ret == ZZECODE_OK);
     zzhex_print_data_hex("dec_data", dec_data, dec_len);
 
     size_t remain = data_len;
@@ -603,6 +632,7 @@ void test_sm2_long(zzcrypt_devhandle_p hdev) {
 }
 
 void test_sm2_gw(zzcrypt_devhandle_p hdev) {
+    printf("=====test_sm2_gw\n");
     int ret = 0;
 
     zzcrypt_apphandle_p happ = NULL;
@@ -636,6 +666,7 @@ void test_sm2_gw(zzcrypt_devhandle_p hdev) {
 }
 
 void test_sm4_gw(zzcrypt_devhandle_p hdev) {
+    printf("=====test_sm4_gw\n");
     unsigned char key[16] = {0x52, 0xfd, 0xfc, 0x07, 0x21, 0x82, 0x65, 0x4f, 0x16, 0x3f, 0x5f, 0x0f, 0x9a, 0x62, 0x1d, 0x72};
     unsigned char enc_data[32] = {0x01, 0x6b, 0xde, 0x3b, 0x27, 0x1a, 0x22, 0x2c, 0x39, 0x21, 0x34, 0xbb, 0x6b, 0xe1, 0x0e, 0x74, 0x4a, 0x67, 0xc7, 0x92, 0xd4, 0xe0, 0x62, 0x8f, 0x67, 0x87, 0xf5, 0x1b, 0xa3, 0xc9, 0x31, 0xbc};
     zzcrypt_keyhandle_p hkey;
@@ -674,14 +705,14 @@ int main() {
     ret = zzcrypt_init(&hdev, stderr);
     assert(ret == ZZECODE_OK);
 
-    // test_sm4_gw(hdev);
+    test_sm4_gw(hdev);
     test_sm4_ecb(hdev);
     test_sm4_ecb_padding(hdev);
     test_sm4_ecb_padding_zero(hdev);
     test_sm4_ecb_padding_pkcs5(hdev);
     test_sm4_cbc(hdev);
-    test_sm4_ecb_long(hdev);
     test_sm4_ecb_17(hdev);
+    test_sm4_ecb_long(hdev);
     test_sm2(hdev);
     test_sm2_from_hex(hdev);
     test_sm2_gw(hdev);

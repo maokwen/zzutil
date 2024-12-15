@@ -68,7 +68,7 @@ target_include_directories(
   zzcrypt PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                  $<INSTALL_INTERFACE:include>)
 
-target_link_libraries(zzcrypt skf zzhex zzcommon)
+target_link_libraries(zzcrypt skf zzcommon)
 
 # ====== message
 

@@ -4,3 +4,4 @@ install
 cmake_build
 .vscode/settings.json
 .cache
+compile_commands.json

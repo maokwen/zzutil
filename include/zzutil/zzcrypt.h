@@ -22,7 +22,7 @@ typedef enum _zzcrypt_padding_t {
     zzcrypt_padding_zero = 1,
     /// @brief PKCS5 填充
     zzcrypt_padding_pkcs5 = 5,
-    /// @brief PKCS7 填充 (未实现)
+    /// @brief PKCS7 填充
     zzcrypt_padding_pkcs7 = 7,
 } zzcrypt_padding_t;
 
@@ -99,7 +99,6 @@ int zzcrypt_sm2_decrypt(const zzcrypt_devhandle_t *hdev, const uint8_t *prikey, 
 /// @return 错误代码, 0 表示成功
 int zzcrypt_sm4_import_key(const zzcrypt_devhandle_t *hdev, const uint8_t *key, zzcrypt_keyhandle_t **hkey);
 
-
 /// @brief 初始化 SM4 加密, 初始化后可以调用任意次数的 push, peek 操作
 /// @param[in] hkey 加密句柄
 /// @param[in] param 加密参数
@@ -130,7 +129,7 @@ int zzcrypt_sm4_encrypt_pop(zzcrypt_keyhandle_t *hkey, uint8_t **enc_data, size_
 /// @brief 初始化 SM4 解密, 初始化后可以调用任意次数的 push, peek 操作
 /// @param[in] hkey 解密句柄
 /// @param[in] param 解密参数
-/// @return 错误代码, 0 表示成功 
+/// @return 错误代码, 0 表示成功
 int zzcrypt_sm4_decrypt_init(zzcrypt_keyhandle_t *hkey, zzcrypt_cipherp_param_t param);
 
 /// @brief 向缓存中追加解密数据
