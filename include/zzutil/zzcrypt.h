@@ -50,6 +50,18 @@ typedef struct _zzcrypt_cipherp_param {
     zzcrypt_padding_t padding_type;
 } zzcrypt_cipherp_param_t;
 
+typedef struct _zzcrypt_devinfo {
+    char issuer[64];
+    char serial_number[32];
+	unsigned space_total; 
+	unsigned space_avali; 
+} zzcrypt_devinfo_t;
+
+typedef struct _zzcrypt_appinfo {
+    char app_name[128];
+    unsigned retry;
+} zzcrypt_appinfo_t;
+
 /// @brief 初始化设备，生成一个加密设备句柄
 /// @param[out] hdev 设备句柄
 /// @param[in] log 日志文件句柄
@@ -168,7 +180,7 @@ int zzcrypt_sm4_release(zzcrypt_keyhandle_t *hkey);
 /// @param[in] data 
 /// @param[in] len 
 /// @return 错误代码, 0 表示成功
-int zzcrypt_writefile(zzcrypt_apphandle_t *happ, const char *filename, uint8_t *data, size_t len);
+int zzcrypt_writefile(const zzcrypt_apphandle_t *happ, const char *filename, const uint8_t *data, size_t len);
 
 /// @brief 读取文件
 /// @param[in] happ 应用句柄
@@ -176,13 +188,16 @@ int zzcrypt_writefile(zzcrypt_apphandle_t *happ, const char *filename, uint8_t *
 /// @param[out] data 
 /// @param[out] len 
 /// @return 错误代码, 0 表示成功
-int zzcrypt_readfile(zzcrypt_apphandle_t *happ, const char *filename, uint8_t **data, size_t *len);
+int zzcrypt_readfile(const zzcrypt_apphandle_t *happ, const char *filename, uint8_t **data, size_t *len);
 
 /// @brief 删除文件
 /// @param[in] happ 
 /// @param[in] filename 
 /// @return 错误代码, 0 表示成功
-int zzcrypt_removefile(zzcrypt_apphandle_t *happ, const char *filename);
+int zzcrypt_removefile(const zzcrypt_apphandle_t *happ, const char *filename);
 
+int zzcrypt_devinfo(const zzcrypt_devhandle_t *hdev, zzcrypt_devinfo_t *info);
+
+int zzcrypt_appinfo(const zzcrypt_apphandle_t *happ, zzcrypt_appinfo_t *info);
 
 #endif // ZZUTIL_ZZCRYPT_H

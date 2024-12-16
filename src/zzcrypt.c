@@ -73,6 +73,7 @@ struct _zzcrypt_apphandle {
     skf_handle_t skf_handle;
     bool is_initialized;
     u32 retry;
+    char app_name[64];
 };
 
 struct _zzcrypt_ctnhandle {
@@ -159,6 +160,7 @@ int zzcrypt_init_app(const hdev_t *hdev, const char *app_name, const char *pin, 
     }
 
     happ_t *app = malloc(sizeof(zzcrypt_apphandle_t));
+    strcpy(app->app_name, app_name);
     *happ = app;
     app->is_initialized = false;
     ret = FunctionList->SKF_OpenApplication(hdev->skf_handle, (char *)app_name, &app->skf_handle);
@@ -170,6 +172,8 @@ int zzcrypt_init_app(const hdev_t *hdev, const char *app_name, const char *pin, 
     if (skf_error("SKF_VerifyPIN", ret)) {
         return ZZECODE_SKF_ERR;
     }
+
+    app->is_initialized = true;
 
     return ZZECODE_OK;
 }
@@ -192,6 +196,10 @@ int zzcrypr_release_app(happ_t *happ) {
 }
 
 int zzcrypt_sm2_import_key(const hdev_t *hdev, const happ_t *happ, const u8 *prikey, const u8 *pubkey) {
+    int ret;
+    if (!happ->is_initialized || !hdev->is_initialized ) {
+        return ZZECODE_NO_INIT;
+    }
 
     /**
      *how to import sm2 keypair:
@@ -202,9 +210,6 @@ int zzcrypt_sm2_import_key(const hdev_t *hdev, const happ_t *happ, const u8 *pri
      *5\use sm2 pubkey encrypt sm1 key ,and then copy to env.ECCCipherBlob
      *6\call SKF_ImportECCKeyPair
      */
-
-    int ret;
-
     HCONTAINER hctn = NULL;
 
     // 1. create conatiner
@@ -654,9 +659,9 @@ int zzcrypt_sm4_release(hkey_t *hkey) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_writefile(happ_t *happ, const char *filename, u8 *data, size_t len) {
+int zzcrypt_writefile(const happ_t *happ, const char *filename, const u8 *data, size_t len) {
     u32 ret;
-    if (happ->is_initialized) {
+    if (!happ->is_initialized) {
         return ZZECODE_NO_INIT;
     }
 
@@ -693,7 +698,7 @@ int zzcrypt_writefile(happ_t *happ, const char *filename, u8 *data, size_t len) 
         return ZZECODE_SKF_ERR;
     }
 
-    ret = FunctionList->SKF_WriteFile(happ->skf_handle, (char *)filename, 0, data, len);
+    ret = FunctionList->SKF_WriteFile(happ->skf_handle, (char *)filename, 0, (char *)data, len);
     if (skf_error("SKF_WriteFile()", ret)) {
         return ZZECODE_SKF_ERR;
     }
@@ -701,9 +706,9 @@ int zzcrypt_writefile(happ_t *happ, const char *filename, u8 *data, size_t len) 
     return ZZECODE_OK;
 }
 
-int zzcrypt_readfile(happ_t *happ, const char *filename, u8 **data, size_t *len) {
+int zzcrypt_readfile(const happ_t *happ, const char *filename, u8 **data, size_t *len) {
     u32 ret;
-    if (happ->is_initialized) {
+    if (!happ->is_initialized) {
         return ZZECODE_NO_INIT;
     }
 
@@ -745,9 +750,9 @@ int zzcrypt_readfile(happ_t *happ, const char *filename, u8 **data, size_t *len)
     return ZZECODE_OK;
 }
 
-int zzcrypt_removefile(zzcrypt_apphandle_t *happ, const char *filename) {
+int zzcrypt_removefile(const happ_t *happ, const char *filename) {
     u32 ret;
-    if (happ->is_initialized) {
+    if (!happ->is_initialized) {
         return ZZECODE_NO_INIT;
     }
 
@@ -759,10 +764,40 @@ int zzcrypt_removefile(zzcrypt_apphandle_t *happ, const char *filename) {
         return ZZECODE_SKF_ERR;
     }
 
-    ret = FunctionList->SKF_DeleteFile(happ->skf_handle, filename);
+    ret = FunctionList->SKF_DeleteFile(happ->skf_handle, (char *)filename);
     if (skf_error("SKF_DeleteFile", ret)) {
         return ZZECODE_SKF_ERR;
     }
+
+    return ZZECODE_OK;
+}
+
+int zzcrypt_devinfo(const hdev_t *hdev, zzcrypt_devinfo_t *info) {
+    u32 ret;
+    if (!hdev->is_initialized) {
+        return ZZECODE_NO_INIT;
+    }
+
+    DEVINFO inf;
+    memset(&inf, 0, sizeof(DEVINFO));
+    ret = FunctionList->SKF_GetDevInfo(hdev->skf_handle, &inf);
+    if (skf_error("SKF_GetDevInfo", ret)) {
+        return ZZECODE_SKF_ERR;
+    }
+    
+    info->space_total = inf.TotalSpace;
+    info->space_avali = inf.FreeSpace;
+    memcpy(info->issuer, inf.Issuer, 64);
+    memcpy(info->serial_number, inf.SerialNumber, 32);
+
+    return ZZECODE_OK;
+}
+
+int zzcrypt_appinfo(const happ_t *happ, zzcrypt_appinfo_t *info) {
+    u32 ret;
+    
+    strcpy(info->app_name, happ->app_name);
+    info->retry = happ->retry;
 
     return ZZECODE_OK;
 }

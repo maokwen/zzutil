@@ -754,6 +754,13 @@ int main() {
     ret = zzcrypt_init(&hdev, stderr);
     assert(ret == ZZECODE_OK);
 
+    zzcrypt_devinfo_t info;
+    ret = zzcrypt_devinfo(hdev, &info);
+    assert(ret == ZZECODE_OK);
+    printf("dev serial number: %s\n", info.serial_number);
+    printf("dev issuer: %s\n", info.issuer);
+    printf("dev space: %u/%u\n", info.space_avali, info.space_total);
+
     test_sm4_gw(hdev);
     test_sm4_ecb(hdev);
     test_sm4_ecb_padding(hdev);
