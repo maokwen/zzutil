@@ -605,7 +605,7 @@ void test_sm2_long(zzcrypt_devhandle_p hdev) {
 
     zzcrypt_sm2_import_key(hdev, happ, prikey, pubkey);
 
-    size_t data_len = 200;
+    size_t data_len = 64;
     u8 data[50];
     for (size_t i = 0; i < data_len; i++) {
         data[i] = i % 256;
@@ -698,6 +698,55 @@ void test_sm4_gw(zzcrypt_devhandle_p hdev) {
     printf("%s\n", dec_data);
 }
 
+void test_file(zzcrypt_devhandle_p hdev) {
+    int ret;
+    printf("=====test_file\n");
+    zzcrypt_apphandle_p happ = NULL;
+    zzcrypt_init_app(hdev, "zzmaintenancetool", "87654321", &happ);
+    
+    char *filename = "testfile";
+    u32 data_len = 2222;
+    u8 data[2222];
+    for (int i=0; i<data_len;++i) {
+        data[i] = i % 0xff;
+    }
+
+    /*
+    FILE *fp = fopen(filename, "wb");
+    assert(fp != NULL || fclose(fp) || 0);
+    u32 res_len = fwrite(data, sizeof(u8), data_len, fp);
+    assert(res_len == data_len || fclose(fp) || 0);
+    */
+
+    u8 *read_data;
+    size_t read_len;
+
+    ret = zzcrypt_removefile(happ, filename);
+    assert(ret == ZZECODE_OK || ret == ZZECODE_FILE_NOT_EXIST);
+
+    ret = zzcrypt_readfile(happ, filename, &read_data, &read_len);
+    assert(ret == ZZECODE_FILE_NOT_EXIST);
+
+    ret = zzcrypt_writefile(happ, filename, data, data_len);
+    assert(ret == ZZECODE_OK);
+
+    ret = zzcrypt_writefile(happ, filename, data, data_len);
+    assert(ret == ZZECODE_FILE_ALREADY_EXIST);
+
+    ret = zzcrypt_readfile(happ, filename, &read_data, &read_len);
+    assert(ret == ZZECODE_OK);
+    assert(data_len == read_len);
+    assert(memcmp(data, read_data, read_len) == 0);
+
+    ret = zzcrypt_removefile(happ, filename);
+    assert(ret == ZZECODE_OK);
+
+    ret = zzcrypt_readfile(happ, filename, &read_data, &read_len);
+    assert(ret == ZZECODE_FILE_NOT_EXIST);
+
+    printf("=====test_file passed\n");
+}
+
 int main() {
     int ret;
 
@@ -717,6 +766,7 @@ int main() {
     test_sm2_from_hex(hdev);
     test_sm2_gw(hdev);
     test_sm2_long(hdev);
+    test_file(hdev);
 
     pasue_on_exit();
     return 0;

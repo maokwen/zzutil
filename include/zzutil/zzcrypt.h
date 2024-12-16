@@ -64,6 +64,11 @@ int zzcrypt_init(zzcrypt_devhandle_t **hdev, FILE *log);
 /// @return 错误代码, 0 表示成功
 int zzcrypt_init_app(const zzcrypt_devhandle_t *hdev, const char *app_name, const char *pin, zzcrypt_apphandle_t **happ);
 
+/// @brief 释放应用句柄
+/// @param[in] happ 
+/// @return 错误代码, 0 表示成功
+int zzcrypt_release_app(zzcrypt_apphandle_t *happ);
+
 /// @brief 导入 SM2 密钥对
 /// @param[in] hdev 设备句柄
 /// @param[in] happ 应用句柄
@@ -156,5 +161,28 @@ int zzcrypt_sm4_decrypt_pop(zzcrypt_keyhandle_t *hkey, uint8_t **enc_data, size_
 /// @param[in] hkey 加密句柄
 /// @return 错误代码, 0 表示成功
 int zzcrypt_sm4_release(zzcrypt_keyhandle_t *hkey);
+
+/// @brief 写入文件
+/// @param[in] happ 应用句柄
+/// @param[in] filename 
+/// @param[in] data 
+/// @param[in] len 
+/// @return 错误代码, 0 表示成功
+int zzcrypt_writefile(zzcrypt_apphandle_t *happ, const char *filename, uint8_t *data, size_t len);
+
+/// @brief 读取文件
+/// @param[in] happ 应用句柄
+/// @param[in] filename 
+/// @param[out] data 
+/// @param[out] len 
+/// @return 错误代码, 0 表示成功
+int zzcrypt_readfile(zzcrypt_apphandle_t *happ, const char *filename, uint8_t **data, size_t *len);
+
+/// @brief 删除文件
+/// @param[in] happ 
+/// @param[in] filename 
+/// @return 错误代码, 0 表示成功
+int zzcrypt_removefile(zzcrypt_apphandle_t *happ, const char *filename);
+
 
 #endif // ZZUTIL_ZZCRYPT_H

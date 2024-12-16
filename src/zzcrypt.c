@@ -22,7 +22,7 @@
 
 typedef struct _zzcrypt_devhandle hdev_t;
 typedef struct _zzcrypt_keyhandle hkey_t;
-typedef struct _zzcrypt_apphandle app_t;
+typedef struct _zzcrypt_apphandle happ_t;
 typedef struct _zzcrypt_ctnhandle ctn_t;
 typedef struct _zzcrypt_cipherp_param cparam_t;
 typedef HANDLE skf_handle_t;
@@ -151,14 +151,14 @@ int zzcrypt_init(hdev_t **hdev, FILE *log) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_init_app(const hdev_t *hdev, const char *app_name, const char *pin, app_t **happ) {
+int zzcrypt_init_app(const hdev_t *hdev, const char *app_name, const char *pin, happ_t **happ) {
     int ret;
 
     if (!hdev->is_initialized) {
         return ZZECODE_NO_INIT;
     }
 
-    app_t *app = malloc(sizeof(zzcrypt_apphandle_t));
+    happ_t *app = malloc(sizeof(zzcrypt_apphandle_t));
     *happ = app;
     app->is_initialized = false;
     ret = FunctionList->SKF_OpenApplication(hdev->skf_handle, (char *)app_name, &app->skf_handle);
@@ -174,7 +174,24 @@ int zzcrypt_init_app(const hdev_t *hdev, const char *app_name, const char *pin, 
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm2_import_key(const hdev_t *hdev, const app_t *happ, const uint8_t *prikey, const uint8_t *pubkey) {
+int zzcrypr_release_app(happ_t *happ) {
+    if (happ == NULL) {
+        return ZZECODE_DOUBLE_RELEASE;
+    }
+    u32 ret;
+    ret = FunctionList->SKF_ClearSecureState(happ->skf_handle);
+    if (skf_error("SKF_ClearSecureState", ret)) {
+        return ZZECODE_SKF_ERR;
+    }
+    ret = FunctionList->SKF_CloseApplication(happ->skf_handle);
+    if (skf_error("SKF_CloseApplication", ret)) {
+        return ZZECODE_SKF_ERR;
+    }
+    free(happ);
+    return ZZECODE_OK;
+}
+
+int zzcrypt_sm2_import_key(const hdev_t *hdev, const happ_t *happ, const u8 *prikey, const u8 *pubkey) {
 
     /**
      *how to import sm2 keypair:
@@ -273,7 +290,7 @@ int zzcrypt_sm2_import_key(const hdev_t *hdev, const app_t *happ, const uint8_t 
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm2_encrypt(const hdev_t *hdev, const uint8_t *pubkey, const uint8_t *data, size_t len, uint8_t **enc_data, size_t *enc_len) {
+int zzcrypt_sm2_encrypt(const hdev_t *hdev, const u8 *pubkey, const u8 *data, size_t len, u8 **enc_data, size_t *enc_len) {
     int ret;
     if (!hdev->is_initialized) {
         return ZZECODE_CRYPO_NO_INIT;
@@ -305,7 +322,7 @@ int zzcrypt_sm2_encrypt(const hdev_t *hdev, const uint8_t *pubkey, const uint8_t
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm2_decrypt(const hdev_t *hdev, const uint8_t *prikey, const uint8_t *enc_data, size_t enc_len, uint8_t **data, size_t *len) {
+int zzcrypt_sm2_decrypt(const hdev_t *hdev, const u8 *prikey, const u8 *enc_data, size_t enc_len, u8 **data, size_t *len) {
     int ret;
 
     if (!hdev->is_initialized) {
@@ -338,7 +355,7 @@ int zzcrypt_sm2_decrypt(const hdev_t *hdev, const uint8_t *prikey, const uint8_t
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_import_key(const hdev_t *hdev, const uint8_t *key, hkey_t **hkey) {
+int zzcrypt_sm4_import_key(const hdev_t *hdev, const u8 *key, hkey_t **hkey) {
     int ret;
 
     hkey_t *h = malloc(sizeof(hkey_t));
@@ -380,7 +397,7 @@ int zzcrypt_sm4_encrypt_init(hkey_t *hkey, cparam_t param) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_encrypt_push(hkey_t *hkey, const uint8_t *data, size_t len) {
+int zzcrypt_sm4_encrypt_push(hkey_t *hkey, const u8 *data, size_t len) {
     int ret;
 
     if (!hkey->is_initialized) {
@@ -428,7 +445,7 @@ int zzcrypt_sm4_encrypt_push(hkey_t *hkey, const uint8_t *data, size_t len) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_encrypt_peek(const hkey_t *hkey, uint8_t **enc_data, size_t *enc_len) {
+int zzcrypt_sm4_encrypt_peek(const hkey_t *hkey, u8 **enc_data, size_t *enc_len) {
     if (!hkey->is_initialized) {
         return ZZECODE_CRYPO_NO_INIT;
     }
@@ -440,7 +457,7 @@ int zzcrypt_sm4_encrypt_peek(const hkey_t *hkey, uint8_t **enc_data, size_t *enc
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_encrypt_pop(hkey_t *hkey, uint8_t **enc_data, size_t *enc_len) {
+int zzcrypt_sm4_encrypt_pop(hkey_t *hkey, u8 **enc_data, size_t *enc_len) {
     int ret;
 
     if (!hkey->is_initialized) {
@@ -519,7 +536,7 @@ int zzcrypt_sm4_decrypt_init(hkey_t *hkey, cparam_t param) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_decrypt_push(hkey_t *hkey, const uint8_t *data, size_t len) {
+int zzcrypt_sm4_decrypt_push(hkey_t *hkey, const u8 *data, size_t len) {
     int ret;
 
     if (!hkey->is_initialized) {
@@ -566,7 +583,7 @@ int zzcrypt_sm4_decrypt_push(hkey_t *hkey, const uint8_t *data, size_t len) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_decrypt_peek(const hkey_t *hkey, uint8_t **enc_data, size_t *enc_len) {
+int zzcrypt_sm4_decrypt_peek(const hkey_t *hkey, u8 **enc_data, size_t *enc_len) {
     if (!hkey->is_initialized) {
         return ZZECODE_CRYPO_NO_INIT;
     }
@@ -578,7 +595,7 @@ int zzcrypt_sm4_decrypt_peek(const hkey_t *hkey, uint8_t **enc_data, size_t *enc
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_decrypt_pop(hkey_t *hkey, uint8_t **enc_data, size_t *enc_len) {
+int zzcrypt_sm4_decrypt_pop(hkey_t *hkey, u8 **enc_data, size_t *enc_len) {
     int ret;
 
     if (!hkey->is_initialized) {
@@ -622,7 +639,7 @@ int zzcrypt_sm4_decrypt_pop(hkey_t *hkey, uint8_t **enc_data, size_t *enc_len) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm4_release(zzcrypt_keyhandle_t *hkey) {
+int zzcrypt_sm4_release(hkey_t *hkey) {
     if (hkey && !hkey->is_initialized) {
         return ZZECODE_DOUBLE_RELEASE;
     }
@@ -633,6 +650,119 @@ int zzcrypt_sm4_release(zzcrypt_keyhandle_t *hkey) {
         free(hkey->padding_buf);
     }
     free(hkey);
+
+    return ZZECODE_OK;
+}
+
+int zzcrypt_writefile(happ_t *happ, const char *filename, u8 *data, size_t len) {
+    u32 ret;
+    if (happ->is_initialized) {
+        return ZZECODE_NO_INIT;
+    }
+
+    FILEATTRIBUTE info;
+    ret = FunctionList->SKF_GetFileInfo(happ->skf_handle, (char *)filename, &info);
+    if (ret == SAR_FILE_NOT_EXIST) {
+    } else if (ret == SAR_OK) {
+        return ZZECODE_FILE_ALREADY_EXIST;
+    } else if (skf_error("GetFileInfo()", ret)) {
+        return ZZECODE_SKF_ERR;
+    }
+
+    /*
+    FILE *fp = fopen(filename, "rb");
+    if (fp == NULL) {
+        return ZZECODE_FILE_OPEN_FAILED;
+    }
+    fseek(fp, 0, SEEK_END);
+    long fsize = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    u8 *file_data = (u8 *)malloc(fsize + 1); // 1KB
+    len = (unsigned long)fread(file_data, 1, fsize, fp);
+    fclose(fp);
+    if (len == 0) {
+        return ZZECODE_FILE_OPEN_FAILED;
+    }
+
+    printf("file size: %d\n", len);
+    printf("file content: %s\n", file_data);
+    */
+    
+    ret = FunctionList->SKF_CreateFile(happ->skf_handle, (char *)filename, len, SECURE_ANYONE_ACCOUNT, SECURE_ANYONE_ACCOUNT);
+    if (skf_error("SKF_CreateFile()", ret)) {
+        return ZZECODE_SKF_ERR;
+    }
+
+    ret = FunctionList->SKF_WriteFile(happ->skf_handle, (char *)filename, 0, data, len);
+    if (skf_error("SKF_WriteFile()", ret)) {
+        return ZZECODE_SKF_ERR;
+    }
+
+    return ZZECODE_OK;
+}
+
+int zzcrypt_readfile(happ_t *happ, const char *filename, u8 **data, size_t *len) {
+    u32 ret;
+    if (happ->is_initialized) {
+        return ZZECODE_NO_INIT;
+    }
+
+    FILEATTRIBUTE info;
+    ret = FunctionList->SKF_GetFileInfo(happ->skf_handle, (char *)filename, &info);
+    if (ret == SAR_FILE_NOT_EXIST) {
+        return ZZECODE_FILE_NOT_EXIST;
+    } else if (skf_error("GetFileInfo()", ret)) {
+        return ZZECODE_SKF_ERR;
+    }
+
+    u32 buf_len = 1024;
+    u8 *buf = malloc(buf_len);
+    u32 empty_len = buf_len;
+    u32 data_len = 0;
+    u32 read_len = empty_len;
+    while (true) {
+        ret = FunctionList->SKF_ReadFile(happ->skf_handle, (char *)filename, data_len, empty_len, buf + data_len, &read_len);
+        if (skf_error("SKF_ReadFile", ret)) {
+            free(buf);
+            return ZZECODE_SKF_ERR;
+        }
+        data_len += read_len;
+        if (read_len == 0 || read_len < empty_len) {
+            break;
+        } else {
+            empty_len = buf_len;
+            buf_len *= 2;
+            buf = realloc(buf, buf_len);
+            read_len = empty_len;
+            continue;
+        }
+    };
+
+    buf = realloc(buf, data_len);
+    *data = buf;
+    *len = data_len;
+
+    return ZZECODE_OK;
+}
+
+int zzcrypt_removefile(zzcrypt_apphandle_t *happ, const char *filename) {
+    u32 ret;
+    if (happ->is_initialized) {
+        return ZZECODE_NO_INIT;
+    }
+
+    FILEATTRIBUTE info;
+    ret = FunctionList->SKF_GetFileInfo(happ->skf_handle, (char *)filename, &info);
+    if (ret == SAR_FILE_NOT_EXIST) {
+        return ZZECODE_FILE_NOT_EXIST;
+    } else if (skf_error("GetFileInfo()", ret)) {
+        return ZZECODE_SKF_ERR;
+    }
+
+    ret = FunctionList->SKF_DeleteFile(happ->skf_handle, filename);
+    if (skf_error("SKF_DeleteFile", ret)) {
+        return ZZECODE_SKF_ERR;
+    }
 
     return ZZECODE_OK;
 }
@@ -649,7 +779,7 @@ bool load_library() {
 #ifdef _WIN32
     P_SKF_GetFuncList GetFunction = NULL;
     GetModuleFileName(NULL, path, MAX_PATH);
-    uint8_t *p = strrchr(path, '\\');
+    u8 *p = strrchr(path, '\\');
     if (p) {
         *p = 0;
     }
@@ -822,6 +952,7 @@ size_t unpadding_zero(hkey_t *hkey) {
     }
     return hkey->data_len - remain;
 }
+
 size_t unpadding_pkcs7(hkey_t *hkey) {
     u32 block_size = hkey->block_size;
     if (hkey->data_len % block_size != 0) {
