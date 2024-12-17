@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #if defined(_MINGW) || defined(_WIN32)
 #include <winsock2.h>
@@ -390,94 +391,46 @@ int zzmsg_get_all_interfaces(adapter_info **ifs, u32 *count) {
         return ZZECODE_OS_ERROR;
     }
 
-    int found;
-    int ifname_count = 0;
-    int mapIfIndex[100];
-    char **ifname_list = (char **)malloc(100 * sizeof(char *));
-    ip_addr *ip_list = (ip_addr *)malloc(100 * sizeof(ip_addr));
-    mac_addr *mac_list = (mac_addr *)malloc(100 * sizeof(mac_addr));
-    memset(mapIfIndex, -1, sizeof(mapIfIndex));
-
+    int if_i = 0;
+    adapter_info *info = malloc(100 * sizeof(adapter_info));
     for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr == NULL)
-            continue;
-        if (ifa->ifa_addr->sa_family == AF_INET) {
-            // TODO: drop gateway address
-            // record interface name & ip address
-            found = 0;
-            for (int i = 0; i <= ifname_count; i++) {
-                if (strcmp(ifa->ifa_name, ifname_list[i]) == 0) {
-                    mapIfIndex[ifname_count] = i;
-                    found = 1;
-                    break;
-                }
-            }
-            if (!found) {
-                mapIfIndex[ifname_count] = ifname_count;
-            }
-            ifname_list[ifname_count] = strdup(ifa->ifa_name);
-            ip_list[ifname_count] = ipconv_unix2zz((struct sockaddr_in *)ifa->ifa_addr);
-            ifname_count += 1;
-        } else if (ifa->ifa_addr->sa_family == AF_PACKET) {
-            // record interface name & mac address
-            found = 0;
-            for (int i = 0; i <= ifname_count; i++) {
-                if (strcmp(ifa->ifa_name, ifname_list[i]) == 0) {
-                    mapIfIndex[ifname_count] = i;
-                    found = 1;
-                    break;
-                }
-            }
-            if (!found) {
-                mapIfIndex[ifname_count] = ifname_count;
-            }
-            ifname_list[ifname_count] = strdup(ifa->ifa_name);
-            mac_list[ifname_count] = macconv_unix2zz((struct sockaddr_ll *)ifa->ifa_addr);
-            ifname_count += 1;
-        } else {
+        if (ifa->ifa_addr == NULL) {
             continue;
         }
-    }
-    freeifaddrs(ifaddr);
-
-    *ifs = (adapter_info *)malloc(ifname_count * sizeof(adapter_info));
-    int real_count = 0;
-    for (int i = 0; i < ifname_count; i++) {
-        int real_idx = mapIfIndex[i];
-        if (real_idx == -1) {
+        if (ifa->ifa_addr->sa_family != AF_INET && ifa->ifa_addr->sa_family != AF_PACKET) {
             continue;
-        } else if (real_idx == i) {
-            (*ifs)[i].name = ifname_list[i];
-            (*ifs)[i].mac = mac_list[i];
-            (*ifs)[i].ip_count = 1;
-            real_count += 1;
-        } else {
-            (*ifs)[real_idx].ip_count += 1;
         }
-    }
-    int ifCountMap[100];
-    memset(ifCountMap, 0, sizeof(ifCountMap));
-    for (int i = 0; i < ifname_count; i++) {
-        int real_idx = mapIfIndex[i];
-        if (real_idx == -1) {
-            continue;
-        } else if (real_idx == i) {
-            int ip_index = ifCountMap[real_idx];
-            (*ifs)[real_idx].ip = (ip_addr *)malloc((*ifs)[real_idx].ip_count * sizeof(ip_addr));
-            (*ifs)[real_idx].ip[ip_index] = ip_list[i];
-            ifCountMap[real_idx] += 1;
+        int found = -1;
+        for (int i = 0; i < if_i; ++i) {
+            if (strcmp(ifa->ifa_name, info[i].name) == 0) {
+                found = i;
+                break;
+            }
+        }
+        if (found == -1) {
+            if (ifa->ifa_addr->sa_family == AF_INET) {
+                memset(info + if_i, 0 , sizeof(adapter_info));
+                info[if_i].name = strdup(ifa->ifa_name);
+                info[if_i].ip = (ip_addr *)malloc(1 * sizeof(ip_addr));
+                info[if_i].ip[0] = ipconv_unix2zz((struct sockaddr_in *)ifa->ifa_addr);
+                info[if_i].ip_count = 1;
+                if_i += 1;
+            } else if (ifa->ifa_addr->sa_family == AF_PACKET) {
+                memset(info + if_i, 0 , sizeof(adapter_info));
+                info[if_i].name = strdup(ifa->ifa_name);
+                info[if_i].mac = macconv_unix2zz((struct sockaddr_ll *)ifa->ifa_addr);
+                if_i += 1;
+            }
         } else {
-            int ip_index = ifCountMap[real_idx];
-            (*ifs)[real_idx].ip[ip_index] = ip_list[i];
-            ifCountMap[real_idx] += 1;
+            info[found].ip = (ip_addr *)realloc(info[found].ip, (info[found].ip_count + 1) * sizeof(ip_addr));
+            info[found].ip[info[found].ip_count] = ipconv_unix2zz((struct sockaddr_in *)ifa->ifa_addr);
+            info[found].ip_count += 1;
         }
     }
 
-    free(ifname_list);
-    free(ip_list);
-    free(mac_list);
-    *count = real_count;
-
+    info = realloc(info, if_i * sizeof(adapter_info));
+    *ifs = info;
+    *count = if_i;
 #endif
 
     return ZZECODE_OK;
