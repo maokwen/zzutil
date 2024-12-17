@@ -26,45 +26,19 @@ if(WIN32)
     # 64 bits
     set_property(TARGET skf PROPERTY IMPORTED_LOCATION ${SKF_RUN_WIN64})
     set_property(TARGET skf PROPERTY IMPORTED_IMPLIB ${SKF_LIB_WIN64})
-    add_custom_command(
-      OUTPUT ${PROJECT_BINARY_DIR}/skf.dll
-      COMMAND ${CMAKE_COMMAND} -E copy ${SKF_RUN_WIN64}
-              ${PROJECT_BINARY_DIR}/skf.dll
-      COMMENT "Copying dll to build directory")
-    add_custom_target(skf_runtime ALL DEPENDS ${PROJECT_BINARY_DIR}/skf.dll)
   elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
     # 32 bits
     set_property(TARGET skf PROPERTY IMPORTED_LOCATION ${SKF_RUN_WIN32})
     set_property(TARGET skf PROPERTY IMPORTED_IMPLIB ${SKF_LIB_WIN32})
-    add_custom_command(
-      OUTPUT ${PROJECT_BINARY_DIR}/skf.dll
-      COMMAND ${CMAKE_COMMAND} -E copy ${SKF_RUN_WIN32}
-              ${PROJECT_BINARY_DIR}/skf.dll
-      COMMENT "Copying dll to build directory")
-    add_custom_target(skf_runtime ALL DEPENDS ${PROJECT_BINARY_DIR}/skf.dll)
   endif()
-endif()
-
-if(UNIX)
+elseif(UNIX)
   if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     # 64 bits
     set_property(TARGET skf PROPERTY IMPORTED_LOCATION ${SKF_LIB_UNIX_AMD64})
     set_property(TARGET skf PROPERTY IMPORTED_IMPLIB ${SKF_LIB_UNIX_AMD64})
-    add_custom_command(
-      OUTPUT ${PROJECT_BINARY_DIR}/libskf.so
-      COMMAND ${CMAKE_COMMAND} -E copy ${SKF_LIB_UNIX_AMD64}
-              ${PROJECT_BINARY_DIR}/libskf.so
-      COMMENT "Copying so to build directory")
-    add_custom_target(skf_runtime ALL DEPENDS ${PROJECT_BINARY_DIR}/libskf.so)
   elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
     # 32 bits
     set_property(TARGET skf PROPERTY IMPORTED_LOCATION ${SKF_LIB_UNIX_x86_32})
     set_property(TARGET skf PROPERTY IMPORTED_IMPLIB ${SKF_LIB_UNIX_x86_32})
-    add_custom_command(
-      OUTPUT ${PROJECT_BINARY_DIR}/libskf.so
-      COMMAND ${CMAKE_COMMAND} -E copy ${SKF_LIB_UNIX_x86_32}
-              ${PROJECT_BINARY_DIR}/libskf.so
-      COMMENT "Copying so to build directory")
-    add_custom_target(skf_runtime ALL DEPENDS ${PROJECT_BINARY_DIR}/libskf.so)
   endif()
 endif()

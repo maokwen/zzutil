@@ -64,11 +64,32 @@ set_property(TARGET zzcrypt PROPERTY VERSION ${version})
 set_property(TARGET zzcrypt PROPERTY SOVERSION 0)
 set_property(TARGET zzcrypt PROPERTY INTERFACE_zzcrypt_MAJOR_VERSION 1)
 
+get_target_property(SKF_INCLUDE_DIR skf INTERFACE_INCLUDE_DIRECTORIES)
+target_include_directories(
+  zzcrypt PRIVATE ${SKF_INCLUDE_DIR}
+)
 target_include_directories(
   zzcrypt PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                  $<INSTALL_INTERFACE:include>)
 
-target_link_libraries(zzcrypt skf zzcommon)
+target_link_libraries(zzcrypt zzcommon)
+
+if(WIN32)
+add_custom_command(
+  OUTPUT ${PROJECT_BINARY_DIR}/skf.dll
+  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:skf>
+          ${PROJECT_BINARY_DIR}/skf.dll
+  COMMENT "Copying dll to build directory")
+  add_custom_target(skf_runtime DEPENDS ${PROJECT_BINARY_DIR}/skf.dll)
+elseif(UNIX)
+add_custom_command(
+  OUTPUT ${PROJECT_BINARY_DIR}/libskf.so
+  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:skf>
+          ${PROJECT_BINARY_DIR}/libskf.so
+  COMMENT "Copying so to build directory")
+  add_custom_target(skf_runtime DEPENDS ${PROJECT_BINARY_DIR}/libskf.so)
+endif()
+add_dependencies(zzcrypt skf_runtime)
 
 # ====== message
 
@@ -147,3 +168,9 @@ write_basic_package_version_file(
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/zzutil-config.cmake
               ${CMAKE_CURRENT_BINARY_DIR}/zzutil-config-version.cmake
         DESTINATION lib/cmake/zzutil)
+
+if(WIN32)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/skf.dll DESTINATION bin)
+elseif(UNIX)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libskf.so DESTINATION bin)
+endif()
