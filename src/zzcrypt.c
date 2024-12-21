@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <ctype.h>
 
 #ifdef _UNIX
 #include <unistd.h>
@@ -54,6 +53,7 @@ static size_t padding_zero(hkey_t *hkey);
 static size_t padding_pkcs7(hkey_t *hkey);
 static size_t unpadding_zero(hkey_t *hkey);
 static size_t unpadding_pkcs7(hkey_t *hkey);
+static u8 *datdat(const u8 *dat1, size_t len1, const u8 *dat2, size_t len2);
 
 /************************************************************
  * Public functions
@@ -720,25 +720,6 @@ int zzcrypt_writefile(const happ_t *happ, const char *filename, const u8 *data, 
         return ZZECODE_SKF_ERR;
     }
 
-    /*
-    FILE *fp = fopen(filename, "rb");
-    if (fp == NULL) {
-        return ZZECODE_FILE_OPEN_FAILED;
-    }
-    fseek(fp, 0, SEEK_END);
-    long fsize = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-    u8 *file_data = (u8 *)malloc(fsize + 1); // 1KB
-    len = (unsigned long)fread(file_data, 1, fsize, fp);
-    fclose(fp);
-    if (len == 0) {
-        return ZZECODE_FILE_OPEN_FAILED;
-    }
-
-    printf("file size: %d\n", len);
-    printf("file content: %s\n", file_data);
-    */
-
     ret = FunctionList->SKF_CreateFile(happ->skf_handle, (char *)filename, len, SECURE_ANYONE_ACCOUNT, SECURE_ANYONE_ACCOUNT);
     if (skf_error("SKF_CreateFile()", ret)) {
         return ZZECODE_SKF_ERR;
@@ -848,126 +829,6 @@ int zzcrypt_appinfo(const happ_t *happ, zzcrypt_appinfo_t *info) {
     return ZZECODE_OK;
 }
 
-// clang-format off
-
-#if 0
-
-/* some structures needed for the asn1 encoding */
-typedef struct x9_62_pentanomial_st {
-    int32_t k1;
-    int32_t k2;
-    int32_t k3;
-} X9_62_PENTANOMIAL;
-
-typedef struct x9_62_characteristic_two_st {
-    int32_t m;
-    ASN1_OBJECT *type;
-    union {
-        char *ptr;
-        /* NID_X9_62_onBasis */
-        ASN1_NULL *onBasis;
-        /* NID_X9_62_tpBasis */
-        ASN1_INTEGER *tpBasis;
-        /* NID_X9_62_ppBasis */
-        X9_62_PENTANOMIAL *ppBasis;
-        /* anything else */
-        ASN1_TYPE *other;
-    } p;
-} X9_62_CHARACTERISTIC_TWO;
-
-typedef struct x9_62_fieldid_st {
-    ASN1_OBJECT *fieldType;
-    union {
-        char *ptr;
-        /* NID_X9_62_prime_field */
-        ASN1_INTEGER *prime;
-        /* NID_X9_62_characteristic_two_field */
-        X9_62_CHARACTERISTIC_TWO *char_two;
-        /* anything else */
-        ASN1_TYPE *other;
-    } p;
-} X9_62_FIELDID;
-
-typedef struct x9_62_curve_st {
-    ASN1_OCTET_STRING *a;
-    ASN1_OCTET_STRING *b;
-    ASN1_BIT_STRING *seed;
-} X9_62_CURVE;
-
-struct ec_parameters_st {
-    int32_t version;
-    X9_62_FIELDID *fieldID;
-    X9_62_CURVE *curve;
-    ASN1_OCTET_STRING *base;
-    ASN1_INTEGER *order;
-    ASN1_INTEGER *cofactor;
-} /* ECPARAMETERS */ ;
-
-typedef enum {
-    ECPKPARAMETERS_TYPE_NAMED = 0,
-    ECPKPARAMETERS_TYPE_EXPLICIT,
-    ECPKPARAMETERS_TYPE_IMPLICIT
-} ecpk_parameters_type_t;
-
-struct ecpk_parameters_st {
-    int type;
-    union {
-        ASN1_OBJECT *named_curve;
-        ECPARAMETERS *parameters;
-        ASN1_NULL *implicitlyCA;
-    } value;
-} /* ECPKPARAMETERS */ ;
-
-/* SEC1 ECPrivateKey */
-typedef struct ec_privatekey_st {
-    int32_t version;
-    ASN1_OCTET_STRING *privateKey;
-    ECPKPARAMETERS *parameters;
-    ASN1_BIT_STRING *publicKey;
-} EC_PRIVATEKEY;
-
-DECLARE_ASN1_FUNCTIONS(EC_PRIVATEKEY)
-
-void remove_whitespaces(u8 **data, size_t *len) {
-    // clang-format on
-    u8 *p = *data;
-    u8 *p1 = p;
-    u8 *p2 = p;
-
-    while (p1 - p < *len) {
-        if (!isspace(*p1)) {
-            *p2++ = *p1;
-        }
-        p1++;
-    }
-
-    *len = p2 - p;
-    *data = realloc(*data, *len);
-}
-
-void trimpem(u8 **data, size_t *len) {
-    u8 *p = *data;
-    while (isspace(*p)) {
-        ++p;
-    }
-    *len -= p - *data;
-    u8 *tmp = malloc(*len);
-    memcpy(tmp, p, *len);
-    free(*data);
-    *data = tmp;
-}
-
-#endif
-
-u8* datdat(const u8 *dat1, size_t len1, const u8 *dat2, size_t len2) {
-    for (size_t i = 0; i <= len1 - len2; ++i) {
-        if (memcmp(dat1 + i, dat2, len2) == 0) {
-            return (u8 *)(dat1 + i);
-        }
-    }
-    return NULL;
-}
-
 int zzcrypt_loadpem(const happ_t *happ, const char *filename, u8 **data, size_t *len) {
     int ret;
     u8 *prikey_pem = NULL;
@@ -1000,7 +861,6 @@ int zzcrypt_loadpem(const happ_t *happ, const char *filename, u8 **data, size_t 
             memcpy(param_pem, begin_p, param_len);
             prikey_len -= param_len;
             memmove(prikey_pem, end_p + end_len, prikey_len);
-            // memcpy(prikey_pem, end_p + end_len, prikey_len);
             prikey_pem = realloc(prikey_pem, prikey_len);
         }
     }
@@ -1014,66 +874,6 @@ int zzcrypt_loadpem(const happ_t *happ, const char *filename, u8 **data, size_t 
             free(param_pem);
             return ZZECODE_CRYPT_SSL_ERR;
         }
-
-#if 0
-        /* read pem */
-        char *name = NULL;
-        char *header = NULL;
-        u8 *derdata = NULL;
-        long derlen = 0;
-        ok = PEM_read_bio(mem, &name, &header, &derdata, &derlen);
-        printf("name: %s\n", name);
-        printf("header: %s\n", header);
-        if (!ok) {
-            fprintf(log_output, "PEM_read_bio failed\n");
-            free(prikey_pem);
-            if (param_pem) {
-                free(param_pem);
-            }
-            BIO_free(mem);
-            return ZZECODE_CRYPT_SSL_ERR;
-        }
-
-        zzhex_print_data_hex("derdata", derdata, derlen);
-
-        /* parse information */
-        EC_PRIVATEKEY *key = d2i_EC_PRIVATEKEY(NULL, (const u8 **)(&derdata), derlen);
-        if (key == NULL) {
-            fprintf(log_output, "d2i_EC_PRIVATEKEY failed\n");
-            free(prikey_pem);
-            if (param_pem) {
-                free(param_pem);
-            }
-            BIO_free(mem);
-            return ZZECODE_CRYPT_SSL_ERR;
-        }
-
-        {
-            u8 buf[8192];
-            const u8 *data;
-            int len;
-            char *hex;
-
-            zzhex_bin_to_hex(key->privateKey->data, key->privateKey->length, &hex);
-            printf("privateKey: %s\n", hex);
-
-            zzhex_bin_to_hex(key->publicKey->data, key->publicKey->length, &hex);
-            printf("publicKey: %s\n", hex);
-
-            int type = key->parameters->type;
-            printf("ec type: %d", type);
-        }
-        EC_PRIVATEKEY_free(key);
-
-        OPENSSL_free(name);
-        OPENSSL_free(header);
-        OPENSSL_free(derdata);
-        BIO_free(mem);
-        free(prikey_pem);
-        if (param_pem) {
-            free(param_pem);
-        }
-#endif
 
         const EVP_PKEY *pkey = PEM_read_bio_PrivateKey(mem, NULL, 0, NULL);
         if (pkey == NULL) {
@@ -1102,7 +902,7 @@ int zzcrypt_loadpem(const happ_t *happ, const char *filename, u8 **data, size_t 
         }
 #endif
 
-        /* get public key */{
+        /* get public key */ {
             size_t len;
             ok = EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, NULL, 0, &len);
             if (!ok) {
@@ -1126,7 +926,7 @@ int zzcrypt_loadpem(const happ_t *happ, const char *filename, u8 **data, size_t 
                 return ZZECODE_CRYPT_SSL_ERR;
             }
             // remove leading 0x04
-            if (buf[0] == 0x04) {
+            if (len != 32 && buf[0] == 0x04) {
                 len--;
                 memmove(buf, buf + 1, len);
             }
@@ -1159,8 +959,6 @@ int zzcrypt_loadpem(const happ_t *happ, const char *filename, u8 **data, size_t 
             }
             zzhex_print_data_hex("prikey", buf, len);
         }
-
-
     }
 
     return ZZECODE_OK;
@@ -1280,11 +1078,11 @@ BLOCKCIPHERPARAM gen_block_cipher_param(const cparam_t *param) {
         p.PaddingType = PKCS5_PADDING;
         break;
     case zzcrypt_padding_zero:
-        // TODO - use padding implementation of our own
+        // use padding implementation of our own
         p.PaddingType = NO_PADDING;
         break;
     case zzcrypt_padding_pkcs7:
-        // TODO - use padding implementation of our own
+        // use padding implementation of our own
         p.PaddingType = NO_PADDING;
         break;
     case zzcrypt_padding_none:
@@ -1365,4 +1163,13 @@ size_t unpadding_pkcs7(hkey_t *hkey) {
     }
     // check padding
     return hkey->data_len - remain;
+}
+
+u8 *datdat(const u8 *dat1, size_t len1, const u8 *dat2, size_t len2) {
+    for (size_t i = 0; i <= len1 - len2; ++i) {
+        if (memcmp(dat1 + i, dat2, len2) == 0) {
+            return (u8 *)(dat1 + i);
+        }
+    }
+    return NULL;
 }

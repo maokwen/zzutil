@@ -80,9 +80,7 @@ set_property(TARGET zzcrypt PROPERTY SOVERSION 0)
 set_property(TARGET zzcrypt PROPERTY INTERFACE_zzcrypt_MAJOR_VERSION 1)
 
 get_target_property(SKF_INCLUDE_DIR skf INTERFACE_INCLUDE_DIRECTORIES)
-target_include_directories(
-  zzcrypt PRIVATE ${SKF_INCLUDE_DIR}
-)
+target_include_directories(zzcrypt PRIVATE ${SKF_INCLUDE_DIR})
 target_include_directories(
   zzcrypt PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                  $<INSTALL_INTERFACE:include>)
@@ -90,18 +88,18 @@ target_include_directories(
 target_link_libraries(zzcrypt PRIVATE zzcommon OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
-add_custom_command(
-  OUTPUT ${PROJECT_BINARY_DIR}/skf.dll
-  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:skf>
-          ${PROJECT_BINARY_DIR}/skf.dll
-  COMMENT "Copying dll to build directory")
+  add_custom_command(
+    OUTPUT ${PROJECT_BINARY_DIR}/skf.dll
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:skf>
+            ${PROJECT_BINARY_DIR}/skf.dll
+    COMMENT "Copying dll to build directory")
   add_custom_target(skf_runtime DEPENDS ${PROJECT_BINARY_DIR}/skf.dll)
 elseif(UNIX)
-add_custom_command(
-  OUTPUT ${PROJECT_BINARY_DIR}/libskf.so
-  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:skf>
-          ${PROJECT_BINARY_DIR}/libskf.so
-  COMMENT "Copying so to build directory")
+  add_custom_command(
+    OUTPUT ${PROJECT_BINARY_DIR}/libskf.so
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:skf>
+            ${PROJECT_BINARY_DIR}/libskf.so
+    COMMENT "Copying so to build directory")
   add_custom_target(skf_runtime DEPENDS ${PROJECT_BINARY_DIR}/libskf.so)
 endif()
 add_dependencies(zzcrypt skf_runtime)
@@ -142,6 +140,17 @@ target_link_libraries(zzcache PRIVATE zzcommon ${ZZCACHE_ADDITIONAL_LIBS})
 
 add_library(zzutil::zzmessage ALIAS zzmessage)
 add_library(zzutil::zzcache ALIAS zzcache)
+
+# ====== Cross compile
+
+# if(UNIX) set_target_properties(zzcommon PROPERTIES LINK_OPTIONS
+# "-Wl,--dynamic-linker,./ld-linux-x86-64.so.2") set_target_properties(zzcache
+# PROPERTIES LINK_OPTIONS "-Wl,--dynamic-linker,./ld-linux-x86-64.so.2")
+# set_target_properties(zzmessage PROPERTIES LINK_OPTIONS
+# "-Wl,--dynamic-linker,./ld-linux-x86-64.so.2") set_target_properties(zzcrypt
+# PROPERTIES LINK_OPTIONS "-Wl,--dynamic-linker,./ld-linux-x86-64.so.2")
+# set_target_properties(zzhex PROPERTIES LINK_OPTIONS
+# "-Wl,--dynamic-linker,./ld-linux-x86-64.so.2") endif()
 
 # ====== Test
 
@@ -185,7 +194,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/zzutil-config.cmake
         DESTINATION lib/cmake/zzutil)
 
 if(WIN32)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/skf.dll DESTINATION bin)
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/skf.dll DESTINATION bin)
 elseif(UNIX)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libskf.so DESTINATION bin)
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libskf.so DESTINATION bin)
 endif()
