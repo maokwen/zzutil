@@ -1,20 +1,30 @@
 #include "zzutil/zzcrypt.h"
 #include "common/helper.h"
 
-#include <zzutil/zzcrypt.h>
-#include <zzutil/errmsg.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #ifdef _UNIX
 #include <unistd.h>
 #include <dlfcn.h>
 #endif
 
+#define OPENSSL_API_COMPAT 30000
+#include <openssl/bio.h>
+#include <openssl/pem.h>
+#include <openssl/core_names.h>
+
 #include <skf.h>
+
+#include <zzutil/zzcrypt.h>
+#include <zzutil/errmsg.h>
+
+#ifdef MK_DEBUG
+#include "zzutil/zzhex.h"
+#endif
 
 /************************************************************
  * Declears
@@ -94,7 +104,7 @@ int zzcrypt_init(hdev_t **hdev, FILE *log) {
     log_output = log;
 
     if (is_initialized) {
-        return ZZECODE_CRYPO_ALREADY_INIT;
+        return ZZECODE_CRYPT_ALREADY_INIT;
     }
 
     if (!load_library() && log_output) {
@@ -121,6 +131,38 @@ int zzcrypt_init(hdev_t **hdev, FILE *log) {
     if (strlen((char *)devices) == 0) {
         return ZZECODE_CRYPT_NO_DEVICE;
     }
+
+    char *devname = strdup((char *)devices);
+    if (log_output) {
+        fprintf(log_output, "Device name: %s\n", devname);
+    }
+
+    /* check cwd */
+#ifndef MK_DEBUG
+#ifdef _WIN32
+    char path[MAX_PATH];
+    P_SKF_GetFuncList GetFunction = NULL;
+    GetModuleFileName(NULL, path, MAX_PATH);
+    if (devices[0] != path[0]) {
+        if (log_output) {
+            fprintf(log_output, "path: %s\n", path);
+            fprintf(log_output, "devices: %s\n", devices);
+        }
+        return ZZECODE_CRYPT_WRONG_LOAD_POSITION;
+    }
+#endif
+#ifdef _UNIX
+    char path[128];
+    getcwd(path, sizeof(path));
+    if (true) {
+        if (log_output) {
+            fprintf(log_output, "path: %s\n", path);
+            fprintf(log_output, "devices: %s\n", devices);
+        }
+        return ZZECODE_CRYPT_WRONG_LOAD_POSITION;
+    }
+#endif
+#endif
 
     /* connect device */
     ret = FunctionList->SKF_ConnectDev(devices, &h->skf_handle);
@@ -169,7 +211,11 @@ int zzcrypt_init_app(const hdev_t *hdev, const char *app_name, const char *pin, 
     }
 
     ret = FunctionList->SKF_VerifyPIN(app->skf_handle, USER_TYPE, (char *)pin, &app->retry);
-    if (skf_error("SKF_VerifyPIN", ret)) {
+    if (ret == SAR_PIN_INCORRECT || ret == SAR_PIN_INVALID) {
+        return ZZECODE_PIN_INCORRECT;
+    } else if (ret == SAR_PIN_LOCKED) {
+        return ZZECODE_PIN_LOCKED;
+    } else if (skf_error("SKF_VerifyPIN", ret)) {
         return ZZECODE_SKF_ERR;
     }
 
@@ -197,7 +243,7 @@ int zzcrypr_release_app(happ_t *happ) {
 
 int zzcrypt_sm2_import_key(const hdev_t *hdev, const happ_t *happ, const u8 *prikey, const u8 *pubkey) {
     int ret;
-    if (!happ->is_initialized || !hdev->is_initialized ) {
+    if (!happ->is_initialized || !hdev->is_initialized) {
         return ZZECODE_NO_INIT;
     }
 
@@ -298,7 +344,7 @@ int zzcrypt_sm2_import_key(const hdev_t *hdev, const happ_t *happ, const u8 *pri
 int zzcrypt_sm2_encrypt(const hdev_t *hdev, const u8 *pubkey, const u8 *data, size_t len, u8 **enc_data, size_t *enc_len) {
     int ret;
     if (!hdev->is_initialized) {
-        return ZZECODE_CRYPO_NO_INIT;
+        return ZZECODE_CRYPT_NO_INIT;
     }
 
     ECCPUBLICKEYBLOB pubkey_blob;
@@ -331,7 +377,7 @@ int zzcrypt_sm2_decrypt(const hdev_t *hdev, const u8 *prikey, const u8 *enc_data
     int ret;
 
     if (!hdev->is_initialized) {
-        return ZZECODE_CRYPO_NO_INIT;
+        return ZZECODE_CRYPT_NO_INIT;
     }
 
     ECCPRIVATEKEYBLOB prikey_blob;
@@ -378,7 +424,7 @@ int zzcrypt_sm4_encrypt_init(hkey_t *hkey, cparam_t param) {
     int ret;
 
     if (hkey->is_initialized) {
-        return ZZECODE_CRYPO_ALREADY_INIT;
+        return ZZECODE_CRYPT_ALREADY_INIT;
     }
 
     BLOCKCIPHERPARAM p = gen_block_cipher_param(&param);
@@ -406,7 +452,7 @@ int zzcrypt_sm4_encrypt_push(hkey_t *hkey, const u8 *data, size_t len) {
     int ret;
 
     if (!hkey->is_initialized) {
-        return ZZECODE_CRYPO_NO_INIT;
+        return ZZECODE_CRYPT_NO_INIT;
     }
 
     // check upcomming length of data
@@ -452,7 +498,7 @@ int zzcrypt_sm4_encrypt_push(hkey_t *hkey, const u8 *data, size_t len) {
 
 int zzcrypt_sm4_encrypt_peek(const hkey_t *hkey, u8 **enc_data, size_t *enc_len) {
     if (!hkey->is_initialized) {
-        return ZZECODE_CRYPO_NO_INIT;
+        return ZZECODE_CRYPT_NO_INIT;
     }
 
     *enc_data = malloc(hkey->data_len);
@@ -466,7 +512,7 @@ int zzcrypt_sm4_encrypt_pop(hkey_t *hkey, u8 **enc_data, size_t *enc_len) {
     int ret;
 
     if (!hkey->is_initialized) {
-        return ZZECODE_CRYPO_NO_INIT;
+        return ZZECODE_CRYPT_NO_INIT;
     }
 
     // padding data if last block is not full
@@ -517,7 +563,7 @@ int zzcrypt_sm4_decrypt_init(hkey_t *hkey, cparam_t param) {
     int ret;
 
     if (hkey->is_initialized) {
-        return ZZECODE_CRYPO_ALREADY_INIT;
+        return ZZECODE_CRYPT_ALREADY_INIT;
     }
 
     BLOCKCIPHERPARAM p = gen_block_cipher_param(&param);
@@ -545,7 +591,7 @@ int zzcrypt_sm4_decrypt_push(hkey_t *hkey, const u8 *data, size_t len) {
     int ret;
 
     if (!hkey->is_initialized) {
-        return ZZECODE_CRYPO_NO_INIT;
+        return ZZECODE_CRYPT_NO_INIT;
     }
 
     // check upcomming length of data
@@ -590,7 +636,7 @@ int zzcrypt_sm4_decrypt_push(hkey_t *hkey, const u8 *data, size_t len) {
 
 int zzcrypt_sm4_decrypt_peek(const hkey_t *hkey, u8 **enc_data, size_t *enc_len) {
     if (!hkey->is_initialized) {
-        return ZZECODE_CRYPO_NO_INIT;
+        return ZZECODE_CRYPT_NO_INIT;
     }
 
     *enc_data = malloc(hkey->data_len);
@@ -604,7 +650,7 @@ int zzcrypt_sm4_decrypt_pop(hkey_t *hkey, u8 **enc_data, size_t *enc_len) {
     int ret;
 
     if (!hkey->is_initialized) {
-        return ZZECODE_CRYPO_NO_INIT;
+        return ZZECODE_CRYPT_NO_INIT;
     }
 
     u32 new_len = 0;
@@ -692,7 +738,7 @@ int zzcrypt_writefile(const happ_t *happ, const char *filename, const u8 *data, 
     printf("file size: %d\n", len);
     printf("file content: %s\n", file_data);
     */
-    
+
     ret = FunctionList->SKF_CreateFile(happ->skf_handle, (char *)filename, len, SECURE_ANYONE_ACCOUNT, SECURE_ANYONE_ACCOUNT);
     if (skf_error("SKF_CreateFile()", ret)) {
         return ZZECODE_SKF_ERR;
@@ -784,7 +830,7 @@ int zzcrypt_devinfo(const hdev_t *hdev, zzcrypt_devinfo_t *info) {
     if (skf_error("SKF_GetDevInfo", ret)) {
         return ZZECODE_SKF_ERR;
     }
-    
+
     info->space_total = inf.TotalSpace;
     info->space_avali = inf.FreeSpace;
     memcpy(info->issuer, inf.Issuer, 64);
@@ -795,9 +841,327 @@ int zzcrypt_devinfo(const hdev_t *hdev, zzcrypt_devinfo_t *info) {
 
 int zzcrypt_appinfo(const happ_t *happ, zzcrypt_appinfo_t *info) {
     u32 ret;
-    
+
     strcpy(info->app_name, happ->app_name);
     info->retry = happ->retry;
+
+    return ZZECODE_OK;
+}
+
+// clang-format off
+
+#if 0
+
+/* some structures needed for the asn1 encoding */
+typedef struct x9_62_pentanomial_st {
+    int32_t k1;
+    int32_t k2;
+    int32_t k3;
+} X9_62_PENTANOMIAL;
+
+typedef struct x9_62_characteristic_two_st {
+    int32_t m;
+    ASN1_OBJECT *type;
+    union {
+        char *ptr;
+        /* NID_X9_62_onBasis */
+        ASN1_NULL *onBasis;
+        /* NID_X9_62_tpBasis */
+        ASN1_INTEGER *tpBasis;
+        /* NID_X9_62_ppBasis */
+        X9_62_PENTANOMIAL *ppBasis;
+        /* anything else */
+        ASN1_TYPE *other;
+    } p;
+} X9_62_CHARACTERISTIC_TWO;
+
+typedef struct x9_62_fieldid_st {
+    ASN1_OBJECT *fieldType;
+    union {
+        char *ptr;
+        /* NID_X9_62_prime_field */
+        ASN1_INTEGER *prime;
+        /* NID_X9_62_characteristic_two_field */
+        X9_62_CHARACTERISTIC_TWO *char_two;
+        /* anything else */
+        ASN1_TYPE *other;
+    } p;
+} X9_62_FIELDID;
+
+typedef struct x9_62_curve_st {
+    ASN1_OCTET_STRING *a;
+    ASN1_OCTET_STRING *b;
+    ASN1_BIT_STRING *seed;
+} X9_62_CURVE;
+
+struct ec_parameters_st {
+    int32_t version;
+    X9_62_FIELDID *fieldID;
+    X9_62_CURVE *curve;
+    ASN1_OCTET_STRING *base;
+    ASN1_INTEGER *order;
+    ASN1_INTEGER *cofactor;
+} /* ECPARAMETERS */ ;
+
+typedef enum {
+    ECPKPARAMETERS_TYPE_NAMED = 0,
+    ECPKPARAMETERS_TYPE_EXPLICIT,
+    ECPKPARAMETERS_TYPE_IMPLICIT
+} ecpk_parameters_type_t;
+
+struct ecpk_parameters_st {
+    int type;
+    union {
+        ASN1_OBJECT *named_curve;
+        ECPARAMETERS *parameters;
+        ASN1_NULL *implicitlyCA;
+    } value;
+} /* ECPKPARAMETERS */ ;
+
+/* SEC1 ECPrivateKey */
+typedef struct ec_privatekey_st {
+    int32_t version;
+    ASN1_OCTET_STRING *privateKey;
+    ECPKPARAMETERS *parameters;
+    ASN1_BIT_STRING *publicKey;
+} EC_PRIVATEKEY;
+
+DECLARE_ASN1_FUNCTIONS(EC_PRIVATEKEY)
+
+void remove_whitespaces(u8 **data, size_t *len) {
+    // clang-format on
+    u8 *p = *data;
+    u8 *p1 = p;
+    u8 *p2 = p;
+
+    while (p1 - p < *len) {
+        if (!isspace(*p1)) {
+            *p2++ = *p1;
+        }
+        p1++;
+    }
+
+    *len = p2 - p;
+    *data = realloc(*data, *len);
+}
+
+void trimpem(u8 **data, size_t *len) {
+    u8 *p = *data;
+    while (isspace(*p)) {
+        ++p;
+    }
+    *len -= p - *data;
+    u8 *tmp = malloc(*len);
+    memcpy(tmp, p, *len);
+    free(*data);
+    *data = tmp;
+}
+
+#endif
+
+u8* datdat(const u8 *dat1, size_t len1, const u8 *dat2, size_t len2) {
+    for (size_t i = 0; i <= len1 - len2; ++i) {
+        if (memcmp(dat1 + i, dat2, len2) == 0) {
+            return (u8 *)(dat1 + i);
+        }
+    }
+    return NULL;
+}
+
+int zzcrypt_loadpem(const happ_t *happ, const char *filename, u8 **data, size_t *len) {
+    int ret;
+    u8 *prikey_pem = NULL;
+    size_t prikey_len;
+    u8 *param_pem = NULL;
+    size_t param_len;
+
+    // read pem file to openssl bio
+    ret = zzcrypt_readfile(happ, filename, &prikey_pem, &prikey_len);
+
+    {
+        const char *begin_str = "-----BEGIN SM2 PARAMETERS-----\n";
+        const char *end_str = "-----END SM2 PARAMETERS-----\n";
+        size_t begin_len = strlen(begin_str);
+        u8 *begin_data = malloc(begin_len);
+        memcpy(begin_data, begin_str, begin_len);
+        size_t end_len = strlen(end_str);
+        u8 *end_data = malloc(end_len);
+        memcpy(end_data, end_str, end_len);
+
+        u8 *begin_p = datdat(prikey_pem, prikey_len, begin_data, begin_len);
+        u8 *end_p = datdat(prikey_pem, prikey_len, end_data, end_len);
+
+        free(begin_data);
+        free(end_data);
+
+        if (begin_p != NULL && end_p != NULL) {
+            param_len = end_p + end_len - begin_p;
+            param_pem = malloc(param_len);
+            memcpy(param_pem, begin_p, param_len);
+            prikey_len -= param_len;
+            memmove(prikey_pem, end_p + end_len, prikey_len);
+            // memcpy(prikey_pem, end_p + end_len, prikey_len);
+            prikey_pem = realloc(prikey_pem, prikey_len);
+        }
+    }
+
+    /* parse pem using opensll */ {
+        int ok;
+
+        BIO *mem = BIO_new_mem_buf(prikey_pem, prikey_len);
+        if (mem == NULL) {
+            fprintf(log_output, "BIO_new_mem_buf failed\n");
+            free(param_pem);
+            return ZZECODE_CRYPT_SSL_ERR;
+        }
+
+#if 0
+        /* read pem */
+        char *name = NULL;
+        char *header = NULL;
+        u8 *derdata = NULL;
+        long derlen = 0;
+        ok = PEM_read_bio(mem, &name, &header, &derdata, &derlen);
+        printf("name: %s\n", name);
+        printf("header: %s\n", header);
+        if (!ok) {
+            fprintf(log_output, "PEM_read_bio failed\n");
+            free(prikey_pem);
+            if (param_pem) {
+                free(param_pem);
+            }
+            BIO_free(mem);
+            return ZZECODE_CRYPT_SSL_ERR;
+        }
+
+        zzhex_print_data_hex("derdata", derdata, derlen);
+
+        /* parse information */
+        EC_PRIVATEKEY *key = d2i_EC_PRIVATEKEY(NULL, (const u8 **)(&derdata), derlen);
+        if (key == NULL) {
+            fprintf(log_output, "d2i_EC_PRIVATEKEY failed\n");
+            free(prikey_pem);
+            if (param_pem) {
+                free(param_pem);
+            }
+            BIO_free(mem);
+            return ZZECODE_CRYPT_SSL_ERR;
+        }
+
+        {
+            u8 buf[8192];
+            const u8 *data;
+            int len;
+            char *hex;
+
+            zzhex_bin_to_hex(key->privateKey->data, key->privateKey->length, &hex);
+            printf("privateKey: %s\n", hex);
+
+            zzhex_bin_to_hex(key->publicKey->data, key->publicKey->length, &hex);
+            printf("publicKey: %s\n", hex);
+
+            int type = key->parameters->type;
+            printf("ec type: %d", type);
+        }
+        EC_PRIVATEKEY_free(key);
+
+        OPENSSL_free(name);
+        OPENSSL_free(header);
+        OPENSSL_free(derdata);
+        BIO_free(mem);
+        free(prikey_pem);
+        if (param_pem) {
+            free(param_pem);
+        }
+#endif
+
+        const EVP_PKEY *pkey = PEM_read_bio_PrivateKey(mem, NULL, 0, NULL);
+        if (pkey == NULL) {
+            fprintf(log_output, "PEM_read_bio_PrivateKey failed\n");
+            free(prikey_pem);
+            if (param_pem) {
+                free(param_pem);
+            }
+            BIO_free(mem);
+            return ZZECODE_CRYPT_SSL_ERR;
+        }
+
+#ifdef MK_DEBUG
+        const OSSL_PARAM *params = EVP_PKEY_gettable_params(pkey);
+        if (!params) {
+            fprintf(log_output, "EVP_PKEY_gettable_params failed\n");
+            free(prikey_pem);
+            if (param_pem) {
+                free(param_pem);
+            }
+            BIO_free(mem);
+            return ZZECODE_CRYPT_SSL_ERR;
+        }
+        for (size_t i = 0; params[i].key != 0; ++i) {
+            printf("%s: %d\n", params[i].key, params[i].data_type);
+        }
+#endif
+
+        /* get public key */{
+            size_t len;
+            ok = EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, NULL, 0, &len);
+            if (!ok) {
+                fprintf(log_output, "EVP_PKEY_get_octet_string_param failed\n");
+                free(prikey_pem);
+                if (param_pem) {
+                    free(param_pem);
+                }
+                BIO_free(mem);
+                return ZZECODE_CRYPT_SSL_ERR;
+            }
+            u8 *buf = malloc(len);
+            ok = EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, buf, len, &len);
+            if (!ok) {
+                fprintf(log_output, "EVP_PKEY_get_octet_string_param failed\n");
+                free(prikey_pem);
+                if (param_pem) {
+                    free(param_pem);
+                }
+                BIO_free(mem);
+                return ZZECODE_CRYPT_SSL_ERR;
+            }
+            // remove leading 0x04
+            if (buf[0] == 0x04) {
+                len--;
+                memmove(buf, buf + 1, len);
+            }
+            zzhex_print_data_hex("pubkey", buf, len);
+        }
+
+        /* get private key */ {
+            BIGNUM *bn = NULL;
+            ok = EVP_PKEY_get_bn_param(pkey, OSSL_PKEY_PARAM_PRIV_KEY, &bn);
+            if (!ok) {
+                fprintf(log_output, "EVP_PKEY_get_bn_param failed\n");
+                free(prikey_pem);
+                if (param_pem) {
+                    free(param_pem);
+                }
+                BIO_free(mem);
+                return ZZECODE_CRYPT_SSL_ERR;
+            }
+            size_t len = BN_num_bytes(bn);
+            u8 *buf = malloc(len);
+            len = BN_bn2bin(bn, buf);
+            if (len == 0) {
+                fprintf(log_output, "BN_bn2bin failed\n");
+                free(prikey_pem);
+                if (param_pem) {
+                    free(param_pem);
+                }
+                BIO_free(mem);
+                return ZZECODE_CRYPT_SSL_ERR;
+            }
+            zzhex_print_data_hex("prikey", buf, len);
+        }
+
+
+    }
 
     return ZZECODE_OK;
 }

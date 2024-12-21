@@ -10,6 +10,7 @@ set(CMAKE_C_STANDARD 99)
 include(lib/skf/cmake/skf.cmake)
 
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+set(CMAKE_COLOR_DIAGNOSTICS ON)
 
 set(EXECUTABLE_OUTPUT_PATH "${CMAKE_CURRENT_LIST_DIR}/build")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_LIST_DIR}/build")
@@ -32,6 +33,20 @@ endif()
 if(UNIX)
   add_definitions(-D_UNIX)
 endif()
+
+add_compile_definitions($<$<CONFIG:Debug>:MK_DEBUG>
+                        $<$<CONFIG:Debug>:MK_BYPASS>)
+
+# ====== depends
+
+set(OPENSSL_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/openssl")
+set(OPENSSL_USE_STATIC_LIBS TRUE)
+find_package(OpenSSL REQUIRED)
+get_property(
+  importTargets
+  DIRECTORY "${CMAKE_SOURCE_DIR}"
+  PROPERTY IMPORTED_TARGETS)
+message("importTargets: " ${importTargets})
 
 # ====== common
 
@@ -72,8 +87,8 @@ target_include_directories(
   zzcrypt PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                  $<INSTALL_INTERFACE:include>)
 
+target_link_libraries(zzcrypt PRIVATE zzcommon OpenSSL::SSL OpenSSL::Crypto)
 
-target_link_libraries(zzcrypt PRIVATE zzcommon)
 if(WIN32)
 add_custom_command(
   OUTPUT ${PROJECT_BINARY_DIR}/skf.dll

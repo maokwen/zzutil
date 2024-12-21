@@ -1,6 +1,5 @@
 build
-out
-install
+depends/build
 cmake_build
 .vscode/settings.json
 .cache

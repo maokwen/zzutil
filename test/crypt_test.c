@@ -501,7 +501,7 @@ void test_sm2(zzcrypt_devhandle_p hdev) {
     u8 *enc_data;
     size_t enc_len;
     zzcrypt_apphandle_p happ = NULL;
-    zzcrypt_init_app(hdev, "zzmaintenancetool", "87654321", &happ);
+    zzcrypt_init_app(hdev, "Thinta_Application", "111111", &happ);
     zzcrypt_sm2_import_key(hdev, happ, prikey, pubkey);
     zzcrypt_sm2_encrypt(hdev, pubkey, data, 3, &enc_data, &enc_len);
     zzhex_print_data_hex("enc_data", enc_data, enc_len);
@@ -546,7 +546,7 @@ void test_sm2_from_hex(zzcrypt_devhandle_p hdev) {
     int ret = 0;
 
     zzcrypt_apphandle_p happ = NULL;
-    zzcrypt_init_app(hdev, "zzmaintenancetool", "87654321", &happ);
+    zzcrypt_init_app(hdev, "Thinta_Application", "111111", &happ);
 
     u8 *pubkey, *prikey;
     size_t pubkey_len, prikey_len;
@@ -582,7 +582,7 @@ void test_sm2_long(zzcrypt_devhandle_p hdev) {
     int ret = 0;
 
     zzcrypt_apphandle_p happ = NULL;
-    zzcrypt_init_app(hdev, "zzmaintenancetool", "87654321", &happ);
+    zzcrypt_init_app(hdev, "Thinta_Application", "111111", &happ);
 
     u8 *pubkey, *prikey;
     u64 pubkey_len, prikey_len;
@@ -636,7 +636,7 @@ void test_sm2_gw(zzcrypt_devhandle_p hdev) {
     int ret = 0;
 
     zzcrypt_apphandle_p happ = NULL;
-    zzcrypt_init_app(hdev, "zzmaintenancetool", "87654321", &happ);
+    zzcrypt_init_app(hdev, "Thinta_Application", "111111", &happ);
 
     u8 *pubkey, *prikey;
     size_t pubkey_len, prikey_len;
@@ -702,21 +702,14 @@ void test_file(zzcrypt_devhandle_p hdev) {
     int ret;
     printf("=====test_file\n");
     zzcrypt_apphandle_p happ = NULL;
-    zzcrypt_init_app(hdev, "zzmaintenancetool", "87654321", &happ);
-    
+    zzcrypt_init_app(hdev, "Thinta_Application", "111111", &happ);
+
     char *filename = "testfile";
     u32 data_len = 2222;
     u8 data[2222];
-    for (int i=0; i<data_len;++i) {
+    for (int i = 0; i < data_len; ++i) {
         data[i] = i % 0xff;
     }
-
-    /*
-    FILE *fp = fopen(filename, "wb");
-    assert(fp != NULL || fclose(fp) || 0);
-    u32 res_len = fwrite(data, sizeof(u8), data_len, fp);
-    assert(res_len == data_len || fclose(fp) || 0);
-    */
 
     u8 *read_data;
     size_t read_len;
@@ -747,6 +740,23 @@ void test_file(zzcrypt_devhandle_p hdev) {
     printf("=====test_file passed\n");
 }
 
+void test_loadpem(zzcrypt_devhandle_p hdev) {
+    int ret;
+    printf("=====test_loadpem\n");
+    zzcrypt_apphandle_p happ = NULL;
+    zzcrypt_init_app(hdev, "Thinta_Application", "111111", &happ);
+
+    const char *filename = "private_key.pem";
+    u8 *data;
+    size_t len;
+    ret = zzcrypt_loadpem(happ, filename, &data, &len);
+    assert(ret == ZZECODE_OK);
+
+    zzhex_print_data_hex("private key", data, len);
+    assert(len == 32);
+    printf("=====test_loadpem passed\n");
+}
+
 int main() {
     int ret;
 
@@ -774,6 +784,7 @@ int main() {
     test_sm2_gw(hdev);
     test_sm2_long(hdev);
     test_file(hdev);
+    test_loadpem(hdev);
 
     pasue_on_exit();
     return 0;

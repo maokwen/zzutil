@@ -53,8 +53,8 @@ typedef struct _zzcrypt_cipherp_param {
 typedef struct _zzcrypt_devinfo {
     char issuer[64];
     char serial_number[32];
-	unsigned space_total; 
-	unsigned space_avali; 
+    unsigned space_total;
+    unsigned space_avali;
 } zzcrypt_devinfo_t;
 
 typedef struct _zzcrypt_appinfo {
@@ -77,7 +77,7 @@ int zzcrypt_init(zzcrypt_devhandle_t **hdev, FILE *log);
 int zzcrypt_init_app(const zzcrypt_devhandle_t *hdev, const char *app_name, const char *pin, zzcrypt_apphandle_t **happ);
 
 /// @brief 释放应用句柄
-/// @param[in] happ 
+/// @param[in] happ
 /// @return 错误代码, 0 表示成功
 int zzcrypt_release_app(zzcrypt_apphandle_t *happ);
 
@@ -176,28 +176,30 @@ int zzcrypt_sm4_release(zzcrypt_keyhandle_t *hkey);
 
 /// @brief 写入文件
 /// @param[in] happ 应用句柄
-/// @param[in] filename 
-/// @param[in] data 
-/// @param[in] len 
+/// @param[in] filename
+/// @param[in] data
+/// @param[in] len
 /// @return 错误代码, 0 表示成功
 int zzcrypt_writefile(const zzcrypt_apphandle_t *happ, const char *filename, const uint8_t *data, size_t len);
 
 /// @brief 读取文件
 /// @param[in] happ 应用句柄
-/// @param[in] filename 
-/// @param[out] data 
-/// @param[out] len 
+/// @param[in] filename
+/// @param[out] data
+/// @param[out] len
 /// @return 错误代码, 0 表示成功
 int zzcrypt_readfile(const zzcrypt_apphandle_t *happ, const char *filename, uint8_t **data, size_t *len);
 
 /// @brief 删除文件
-/// @param[in] happ 
-/// @param[in] filename 
+/// @param[in] happ
+/// @param[in] filename
 /// @return 错误代码, 0 表示成功
 int zzcrypt_removefile(const zzcrypt_apphandle_t *happ, const char *filename);
 
 int zzcrypt_devinfo(const zzcrypt_devhandle_t *hdev, zzcrypt_devinfo_t *info);
 
 int zzcrypt_appinfo(const zzcrypt_apphandle_t *happ, zzcrypt_appinfo_t *info);
+
+int zzcrypt_loadpem(const zzcrypt_apphandle_t *happ, const char *filename, uint8_t **data, size_t *len);
 
 #endif // ZZUTIL_ZZCRYPT_H
