@@ -55,7 +55,7 @@ target_include_directories(
   zzhex PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                $<INSTALL_INTERFACE:include>)
 
-target_link_libraries(zzhex zzcommon)
+target_link_libraries(zzhex PRIVATE zzcommon)
 
 # ====== crypt
 
@@ -72,8 +72,8 @@ target_include_directories(
   zzcrypt PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                  $<INSTALL_INTERFACE:include>)
 
-target_link_libraries(zzcrypt zzcommon)
 
+target_link_libraries(zzcrypt PRIVATE zzcommon)
 if(WIN32)
 add_custom_command(
   OUTPUT ${PROJECT_BINARY_DIR}/skf.dll
@@ -106,7 +106,7 @@ if(WIN32)
   set(ZZMESSAGE_ADDITIONAL_LIBS wsock32 ws2_32 iphlpapi)
 endif(WIN32)
 
-target_link_libraries(zzmessage zzcommon ${ZZMESSAGE_ADDITIONAL_LIBS})
+target_link_libraries(zzmessage PRIVATE zzcommon ${ZZMESSAGE_ADDITIONAL_LIBS})
 
 # ====== cache
 
@@ -123,7 +123,7 @@ if(UNIX)
   set(ZZCACHE_ADDITIONAL_LIBS pthread)
 endif()
 
-target_link_libraries(zzcache zzcommon ${ZZCACHE_ADDITIONAL_LIBS})
+target_link_libraries(zzcache PRIVATE zzcommon ${ZZCACHE_ADDITIONAL_LIBS})
 
 add_library(zzutil::zzmessage ALIAS zzmessage)
 add_library(zzutil::zzcache ALIAS zzcache)
@@ -138,7 +138,7 @@ set(CMAKE_INSTALL_PREFIX
     ${CMAKE_CURRENT_LIST_DIR}/../ZZMaintenanceTool/lib/zzutil)
 
 install(
-  TARGETS zzcommon zzhex zzcrypt zzmessage zzcache
+  TARGETS zzhex zzcrypt zzmessage zzcache
   EXPORT zzutil-targets
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
