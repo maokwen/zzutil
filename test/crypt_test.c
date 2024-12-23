@@ -605,8 +605,8 @@ void test_sm2_long(zzcrypt_devhandle_p hdev) {
 
     zzcrypt_sm2_import_key(hdev, happ, prikey, pubkey);
 
-    size_t data_len = 64;
-    u8 data[50];
+    size_t data_len = 256;
+    u8 data[256];
     for (size_t i = 0; i < data_len; i++) {
         data[i] = i % 256;
     }
@@ -746,9 +746,37 @@ void test_loadpem(zzcrypt_devhandle_p hdev) {
     zzcrypt_apphandle_p happ = NULL;
     zzcrypt_init_app(hdev, "Thinta_Application", "111111", &happ);
 
-    const char *filename = "private_key.pem";
-    ret = zzcrypt_sm2_import_key_from_pem(hdev, happ, filename);
+    u8 *pubkey = NULL;
+    u8 *prikey = NULL;
+    {
+        const char *filename = "private_key.pem";
+        ret = zzcrypt_sm2_import_key_from_file(hdev, happ, filename, &prikey);
+        assert(ret == ZZECODE_OK);
+    }
+
+    {
+        const char *filename = "certificate.crt";
+        ret = zzcrypt_sm2_get_pubkey_from_file(hdev, happ, filename, &pubkey);
+        assert(ret == ZZECODE_OK);
+    }
+
+    u8 data[] = {0x11, 0x22, 0x33};
+    size_t data_len = sizeof(data);
+
+    u8 *enc_data;
+    size_t enc_len;
+    ret = zzcrypt_sm2_encrypt(hdev, pubkey, data, data_len, &enc_data, &enc_len);
     assert(ret == ZZECODE_OK);
+    zzhex_print_data_hex("enc_data", enc_data, enc_len);
+
+    u8 *dec_data;
+    size_t dec_len;
+    ret = zzcrypt_sm2_decrypt(hdev, prikey, enc_data, enc_len, &dec_data, &dec_len);
+    assert(ret == ZZECODE_OK);
+    zzhex_print_data_hex("dec_data", dec_data, dec_len);
+
+    assert(dec_len == data_len);
+    assert(memcmp(data, dec_data, dec_len) == 0);
     printf("=====import_key_from_pem passed\n");
 }
 

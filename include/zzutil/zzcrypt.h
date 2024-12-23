@@ -93,7 +93,15 @@ int zzcrypt_sm2_import_key(const zzcrypt_devhandle_t *hdev, const zzcrypt_apphan
 /// @param[in] happ 应用句柄
 /// @param[in] filename PEM 文件名
 /// @return 错误代码, 0 表示成功
-int zzcrypt_sm2_import_key_from_pem(const zzcrypt_devhandle_t *hdev, const zzcrypt_apphandle_t *happ, const char *filename);
+int zzcrypt_sm2_import_key_from_file(const zzcrypt_devhandle_t *hdev, const zzcrypt_apphandle_t *happ, const char *filename, uint8_t **prikey);
+
+/// @brief 从文件中获取公钥
+/// @param[in] hdev 设备句柄
+/// @param[in] happ 应用句柄
+/// @param[in] filename CRT 文件名
+/// @param[in] pubkey 公钥串(二进制表示)
+/// @return 错误代码, 0 表示成功
+int zzcrypt_sm2_get_pubkey_from_file(const zzcrypt_devhandle_t *hdev, const zzcrypt_apphandle_t *happ, const char *filename, uint8_t **pubkey);
 
 /// @brief SM2 加密, 需要首先导入 SM2 密钥对
 /// @param[in] hdev 设备句柄

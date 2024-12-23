@@ -1,6 +1,7 @@
 #include "zzutil/zzcrypt.h"
 #include "common/helper.h"
 
+#include <openssl/x509.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,10 +21,6 @@
 
 #include <zzutil/zzcrypt.h>
 #include <zzutil/errmsg.h>
-
-#ifdef MK_DEBUG
-#include "zzutil/zzhex.h"
-#endif
 
 /************************************************************
  * Declears
@@ -83,7 +80,7 @@ struct _zzcrypt_apphandle {
     skf_handle_t skf_handle;
     bool is_initialized;
     u32 retry;
-    char app_name[64];
+    char app_name[128];
 };
 
 struct _zzcrypt_ctnhandle {
@@ -93,8 +90,8 @@ struct _zzcrypt_ctnhandle {
 
 int zzcrypt_init(hdev_t **hdev, FILE *log) {
     int ret;
-    u8 devices[128] = {0};
-    u8 app_name_buf[128];
+    char devices[128] = {0};
+    char app_name_buf[128];
     u32 devices_size = sizeof(devices);
 
     hdev_t *h = malloc(sizeof(hdev_t));
@@ -138,7 +135,7 @@ int zzcrypt_init(hdev_t **hdev, FILE *log) {
     }
 
     /* check cwd */
-#ifndef MK_DEBUG
+#ifndef ZZUTIL_DEBUG
 #ifdef _WIN32
     char path[MAX_PATH];
     P_SKF_GetFuncList GetFunction = NULL;
@@ -197,6 +194,10 @@ int zzcrypt_init(hdev_t **hdev, FILE *log) {
 int zzcrypt_init_app(const hdev_t *hdev, const char *app_name, const char *pin, happ_t **happ) {
     int ret;
 
+    // call SKF_OpenApplication will crash the stack
+    char pin_buf[128];
+    strcpy(pin_buf, pin);
+
     if (!hdev->is_initialized) {
         return ZZECODE_NO_INIT;
     }
@@ -205,12 +206,12 @@ int zzcrypt_init_app(const hdev_t *hdev, const char *app_name, const char *pin, 
     strcpy(app->app_name, app_name);
     *happ = app;
     app->is_initialized = false;
-    ret = FunctionList->SKF_OpenApplication(hdev->skf_handle, (char *)app_name, &app->skf_handle);
+    ret = FunctionList->SKF_OpenApplication(hdev->skf_handle, app->app_name, &app->skf_handle);
     if (skf_error("SKF_OpenApplication", ret)) {
         return ZZECODE_SKF_ERR;
     }
 
-    ret = FunctionList->SKF_VerifyPIN(app->skf_handle, USER_TYPE, (char *)pin, &app->retry);
+    ret = FunctionList->SKF_VerifyPIN(app->skf_handle, USER_TYPE, (char *)pin_buf, &app->retry);
     if (ret == SAR_PIN_INCORRECT || ret == SAR_PIN_INVALID) {
         return ZZECODE_PIN_INCORRECT;
     } else if (ret == SAR_PIN_LOCKED) {
@@ -829,7 +830,7 @@ int zzcrypt_appinfo(const happ_t *happ, zzcrypt_appinfo_t *info) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_sm2_import_key_from_pem(const hdev_t *hdev, const happ_t *happ, const char *filename) {
+int zzcrypt_sm2_import_key_from_file(const hdev_t *hdev, const happ_t *happ, const char *filename, u8 **prikey_out) {
     int ret;
     u8 *prikey_pem = NULL;
     size_t prikey_len;
@@ -885,7 +886,7 @@ int zzcrypt_sm2_import_key_from_pem(const hdev_t *hdev, const happ_t *happ, cons
         free(prikey_pem);
         BIO_free(mem);
 
-#ifdef MK_DEBUG
+#ifdef ZZUTIL_DEBUG
         const OSSL_PARAM *params = EVP_PKEY_gettable_params(pkey);
         if (!params) {
             fprintf(log_output, "EVP_PKEY_gettable_params failed\n");
@@ -924,8 +925,6 @@ int zzcrypt_sm2_import_key_from_pem(const hdev_t *hdev, const happ_t *happ, cons
             }
         }
 
-        zzhex_print_data_hex("prikey", prikey, 32);
-
         /* get public key */ {
             size_t len;
             ok = EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, NULL, 0, &len);
@@ -955,12 +954,104 @@ int zzcrypt_sm2_import_key_from_pem(const hdev_t *hdev, const happ_t *happ, cons
                 return ZZECODE_CRYPT_BAD_FORMAT;
             }
         }
-        zzhex_print_data_hex("pubkey", pubkey, 64);
 
         EVP_PKEY_free(pkey);
     }
 
-    return zzcrypt_sm2_import_key(hdev, happ, prikey, pubkey);
+    ret = zzcrypt_sm2_import_key(hdev, happ, prikey, pubkey);
+    if (ret != ZZECODE_OK) {
+        return ret;
+    }
+
+    *prikey_out = malloc(32);
+    memcpy(*prikey_out, prikey, 32);
+    return ZZECODE_OK;
+}
+
+int zzcrypt_sm2_get_pubkey_from_file(const hdev_t *hdev, const happ_t *happ, const char *filename, u8 **pubkey_out) {
+    int ret;
+    u8 *crt_pem = NULL;
+    size_t crt_len;
+
+    ret = zzcrypt_readfile(happ, filename, &crt_pem, &crt_len);
+
+    u8 pubkey[64];
+    /* parse pem using opensll */ {
+        int ok;
+
+        BIO *mem = BIO_new_mem_buf(crt_pem, crt_len);
+        if (mem == NULL) {
+            free(crt_pem);
+            fprintf(log_output, "BIO_new_mem_buf failed\n");
+            return ZZECODE_CRYPT_SSL_ERR;
+        }
+
+        X509 *x509 = PEM_read_bio_X509(mem, NULL, 0, NULL);
+        if (x509 == NULL) {
+            fprintf(log_output, "PEM_read_bio_X509 failed\n");
+            free(crt_pem);
+            BIO_free(mem);
+            return ZZECODE_CRYPT_SSL_ERR;
+        }
+
+        free(crt_pem);
+        BIO_free(mem);
+
+        EVP_PKEY *pkey = X509_get_pubkey(x509);
+        if (pkey == NULL) {
+            fprintf(log_output, "X509_get_pubkey failed\n");
+            X509_free(x509);
+            return ZZECODE_CRYPT_SSL_ERR;
+        }
+
+        X509_free(x509);
+
+#ifdef ZZUTIL_DEBUG
+        const OSSL_PARAM *params = EVP_PKEY_gettable_params(pkey);
+
+        for (size_t i = 0; params[i].key != 0; ++i) {
+            printf("%s: %d\n", params[i].key, params[i].data_type);
+        }
+#endif
+
+        /* get public key */ {
+            size_t len;
+            ok = EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, NULL, 0, &len);
+            if (!ok) {
+                fprintf(log_output, "EVP_PKEY_get_octet_string_param failed\n");
+                EVP_PKEY_free(pkey);
+                return ZZECODE_CRYPT_SSL_ERR;
+            }
+            u8 *buf = malloc(len);
+            ok = EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, buf, len, &len);
+            if (!ok) {
+                fprintf(log_output, "EVP_PKEY_get_octet_string_param failed\n");
+                EVP_PKEY_free(pkey);
+                free(buf);
+                return ZZECODE_CRYPT_SSL_ERR;
+            }
+
+            // remove leading 0x04
+            if (len == 64) {
+                memcpy(pubkey, buf, 64);
+                free(buf);
+            } else if (len == 65 && buf[0] == 0x04) {
+                memcpy(pubkey, buf + 1, 64);
+                free(buf);
+            } else {
+                EVP_PKEY_free(pkey);
+                free(buf);
+                return ZZECODE_CRYPT_BAD_FORMAT;
+            }
+        }
+
+        EVP_PKEY_free(pkey);
+    }
+
+    *pubkey_out = malloc(64);
+    memcpy(*pubkey_out, pubkey, 64);
+
+    return ZZECODE_OK;
 }
 
 /************************************************************
