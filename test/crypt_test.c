@@ -780,6 +780,34 @@ void test_loadpem(zzcrypt_devhandle_p hdev) {
     printf("=====import_key_from_pem passed\n");
 }
 
+void test_load_gw_pubkey(zzcrypt_devhandle_p hdev) {
+    int ret;
+    printf("=====import_key_from_pem\n");
+    zzcrypt_apphandle_p happ = NULL;
+    zzcrypt_init_app(hdev, "Thinta_Application", "111111", &happ);
+
+    char *filenames;
+    ret = zzcrypt_enumfiles(happ, &filenames);
+    assert(ret == ZZECODE_OK);
+    printf("filenames: %s\n", filenames);
+
+    {
+        u8 *pubkey = NULL;
+        const char *filename = "certificate.crt";
+        ret = zzcrypt_sm2_get_pubkey_from_file(hdev, happ, filename, &pubkey);
+        assert(ret == ZZECODE_OK);
+    }
+
+    u8 *pubkey = NULL;
+    {
+        const char *filename = "gw_certificate.crt";
+        ret = zzcrypt_sm2_get_pubkey_from_file(hdev, happ, filename, &pubkey);
+        assert(ret == ZZECODE_OK);
+    }
+
+    zzhex_print_data_hex("enc_data", pubkey, 64);
+}
+
 int main() {
     int ret;
 
@@ -807,7 +835,8 @@ int main() {
     // test_sm2_gw(hdev);
     // test_sm2_long(hdev);
     // test_file(hdev);
-    test_loadpem(hdev);
+    // test_loadpem(hdev);
+    test_load_gw_pubkey(hdev);
 
     pasue_on_exit();
     return 0;

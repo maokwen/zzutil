@@ -188,6 +188,12 @@ int zzcrypt_sm4_decrypt_pop(zzcrypt_keyhandle_t *hkey, uint8_t **enc_data, size_
 /// @return 错误代码, 0 表示成功
 int zzcrypt_sm4_release(zzcrypt_keyhandle_t *hkey);
 
+/// @brief 枚举文件
+/// @param[in] happ 应用句柄
+/// @param[out] filenames, split by comma
+/// @param[out] len
+int zzcrypt_enumfiles(const zzcrypt_apphandle_t *happ, char **filenames);
+
 /// @brief 写入文件
 /// @param[in] happ 应用句柄
 /// @param[in] filename

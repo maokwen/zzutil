@@ -34,8 +34,8 @@ if(UNIX)
   add_definitions(-D_UNIX)
 endif()
 
-add_compile_definitions($<$<CONFIG:Debug>:MK_DEBUG>
-                        $<$<CONFIG:Debug>:MK_BYPASS>)
+add_compile_definitions($<$<CONFIG:Debug>:ZZUTIL_DEBUG>
+                        $<$<CONFIG:Debug>:ZZUTIL_BYPASS>)
 
 # ====== depends
 

@@ -1,5 +1,6 @@
 #include "zzutil/zzcrypt.h"
 #include "common/helper.h"
+#include "skf_type.h"
 
 #include <openssl/x509.h>
 #include <stdio.h>
@@ -706,6 +707,41 @@ int zzcrypt_sm4_release(hkey_t *hkey) {
     return ZZECODE_OK;
 }
 
+int zzcrypt_enumfiles(const happ_t *happ, char **filenames) {
+    u32 ret;
+    if (!happ->is_initialized) {
+        return ZZECODE_NO_INIT;
+    }
+    char *buf = malloc(1024);
+    u32 buf_len = sizeof(buf);
+
+    do {
+        ret = FunctionList->SKF_EnumFiles(happ->skf_handle, buf, &buf_len);
+        if (ret == SAR_BUFFER_TOO_SMALL) {
+            buf_len *= 2;
+            buf = realloc(buf, buf_len);
+        } else if (ret == SAR_OK) {
+            break;
+        } else if (skf_error("SKF_EnumFiles", ret)) {
+            free(buf);
+            return ZZECODE_SKF_ERR;
+        }
+    } while (ret == SAR_BUFFER_TOO_SMALL);
+
+    // replace '\0' with ','
+    for (size_t i = 0; i < buf_len; i++) {
+        if (buf[i] == '\0') {
+            buf[i] = ',';
+        }
+    }
+
+    buf = realloc(buf, buf_len - 1);
+    buf[buf_len - 2] = '\0';
+    *filenames = buf;
+
+    return ZZECODE_OK;
+}
+
 int zzcrypt_writefile(const happ_t *happ, const char *filename, const u8 *data, size_t len) {
     u32 ret;
     if (!happ->is_initialized) {
@@ -748,24 +784,29 @@ int zzcrypt_readfile(const happ_t *happ, const char *filename, u8 **data, size_t
         return ZZECODE_SKF_ERR;
     }
 
+#ifdef ZZUTIL_DEBUG
+    printf("file size: %d\n", info.FileSize);
+#endif
+
     u32 buf_len = 1024;
     u8 *buf = malloc(buf_len);
     u32 empty_len = buf_len;
     u32 data_len = 0;
     u32 read_len = empty_len;
-    while (true) {
+    while (data_len < info.FileSize) {
         ret = FunctionList->SKF_ReadFile(happ->skf_handle, (char *)filename, data_len, empty_len, buf + data_len, &read_len);
         if (skf_error("SKF_ReadFile", ret)) {
             free(buf);
             return ZZECODE_SKF_ERR;
         }
-        data_len += read_len;
         if (read_len == 0 || read_len < empty_len) {
+            data_len += read_len;
             break;
         } else {
-            empty_len = buf_len;
+            data_len += read_len;
             buf_len *= 2;
             buf = realloc(buf, buf_len);
+            empty_len = buf_len - data_len;
             read_len = empty_len;
             continue;
         }
@@ -837,6 +878,9 @@ int zzcrypt_sm2_import_key_from_file(const hdev_t *hdev, const happ_t *happ, con
 
     // read pem file to openssl bio
     ret = zzcrypt_readfile(happ, filename, &prikey_pem, &prikey_len);
+    if (ret != ZZECODE_OK) {
+        return ret;
+    }
 
     /* skip param pem if exists */ {
         const char *begin_str = "-----BEGIN SM2 PARAMETERS-----\n";
@@ -974,6 +1018,9 @@ int zzcrypt_sm2_get_pubkey_from_file(const hdev_t *hdev, const happ_t *happ, con
     size_t crt_len;
 
     ret = zzcrypt_readfile(happ, filename, &crt_pem, &crt_len);
+    if (ret != ZZECODE_OK) {
+        return ret;
+    }
 
     u8 pubkey[64];
     /* parse pem using opensll */ {
