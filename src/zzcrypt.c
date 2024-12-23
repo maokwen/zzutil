@@ -829,17 +829,15 @@ int zzcrypt_appinfo(const happ_t *happ, zzcrypt_appinfo_t *info) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_loadpem(const happ_t *happ, const char *filename, u8 **data, size_t *len) {
+int zzcrypt_sm2_import_key_from_pem(const hdev_t *hdev, const happ_t *happ, const char *filename) {
     int ret;
     u8 *prikey_pem = NULL;
     size_t prikey_len;
-    u8 *param_pem = NULL;
-    size_t param_len;
 
     // read pem file to openssl bio
     ret = zzcrypt_readfile(happ, filename, &prikey_pem, &prikey_len);
 
-    {
+    /* skip param pem if exists */ {
         const char *begin_str = "-----BEGIN SM2 PARAMETERS-----\n";
         const char *end_str = "-----END SM2 PARAMETERS-----\n";
         size_t begin_len = strlen(begin_str);
@@ -856,45 +854,42 @@ int zzcrypt_loadpem(const happ_t *happ, const char *filename, u8 **data, size_t 
         free(end_data);
 
         if (begin_p != NULL && end_p != NULL) {
-            param_len = end_p + end_len - begin_p;
-            param_pem = malloc(param_len);
-            memcpy(param_pem, begin_p, param_len);
+            size_t param_len = end_p + end_len - begin_p;
             prikey_len -= param_len;
             memmove(prikey_pem, end_p + end_len, prikey_len);
             prikey_pem = realloc(prikey_pem, prikey_len);
         }
     }
 
+    u8 prikey[32];
+    u8 pubkey[64];
+
     /* parse pem using opensll */ {
         int ok;
 
         BIO *mem = BIO_new_mem_buf(prikey_pem, prikey_len);
         if (mem == NULL) {
+            free(prikey_pem);
             fprintf(log_output, "BIO_new_mem_buf failed\n");
-            free(param_pem);
             return ZZECODE_CRYPT_SSL_ERR;
         }
 
-        const EVP_PKEY *pkey = PEM_read_bio_PrivateKey(mem, NULL, 0, NULL);
+        EVP_PKEY *pkey = PEM_read_bio_PrivateKey(mem, NULL, 0, NULL);
         if (pkey == NULL) {
             fprintf(log_output, "PEM_read_bio_PrivateKey failed\n");
             free(prikey_pem);
-            if (param_pem) {
-                free(param_pem);
-            }
             BIO_free(mem);
             return ZZECODE_CRYPT_SSL_ERR;
         }
+
+        free(prikey_pem);
+        BIO_free(mem);
 
 #ifdef MK_DEBUG
         const OSSL_PARAM *params = EVP_PKEY_gettable_params(pkey);
         if (!params) {
             fprintf(log_output, "EVP_PKEY_gettable_params failed\n");
-            free(prikey_pem);
-            if (param_pem) {
-                free(param_pem);
-            }
-            BIO_free(mem);
+            EVP_PKEY_free(pkey);
             return ZZECODE_CRYPT_SSL_ERR;
         }
         for (size_t i = 0; params[i].key != 0; ++i) {
@@ -902,47 +897,12 @@ int zzcrypt_loadpem(const happ_t *happ, const char *filename, u8 **data, size_t 
         }
 #endif
 
-        /* get public key */ {
-            size_t len;
-            ok = EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, NULL, 0, &len);
-            if (!ok) {
-                fprintf(log_output, "EVP_PKEY_get_octet_string_param failed\n");
-                free(prikey_pem);
-                if (param_pem) {
-                    free(param_pem);
-                }
-                BIO_free(mem);
-                return ZZECODE_CRYPT_SSL_ERR;
-            }
-            u8 *buf = malloc(len);
-            ok = EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, buf, len, &len);
-            if (!ok) {
-                fprintf(log_output, "EVP_PKEY_get_octet_string_param failed\n");
-                free(prikey_pem);
-                if (param_pem) {
-                    free(param_pem);
-                }
-                BIO_free(mem);
-                return ZZECODE_CRYPT_SSL_ERR;
-            }
-            // remove leading 0x04
-            if (len != 32 && buf[0] == 0x04) {
-                len--;
-                memmove(buf, buf + 1, len);
-            }
-            zzhex_print_data_hex("pubkey", buf, len);
-        }
-
         /* get private key */ {
             BIGNUM *bn = NULL;
             ok = EVP_PKEY_get_bn_param(pkey, OSSL_PKEY_PARAM_PRIV_KEY, &bn);
             if (!ok) {
                 fprintf(log_output, "EVP_PKEY_get_bn_param failed\n");
-                free(prikey_pem);
-                if (param_pem) {
-                    free(param_pem);
-                }
-                BIO_free(mem);
+                EVP_PKEY_free(pkey);
                 return ZZECODE_CRYPT_SSL_ERR;
             }
             size_t len = BN_num_bytes(bn);
@@ -950,18 +910,57 @@ int zzcrypt_loadpem(const happ_t *happ, const char *filename, u8 **data, size_t 
             len = BN_bn2bin(bn, buf);
             if (len == 0) {
                 fprintf(log_output, "BN_bn2bin failed\n");
-                free(prikey_pem);
-                if (param_pem) {
-                    free(param_pem);
-                }
-                BIO_free(mem);
+                EVP_PKEY_free(pkey);
+                free(buf);
                 return ZZECODE_CRYPT_SSL_ERR;
             }
-            zzhex_print_data_hex("prikey", buf, len);
+            if (len == 32) {
+                memcpy(prikey, buf, 32);
+                free(buf);
+            } else {
+                EVP_PKEY_free(pkey);
+                free(buf);
+                return ZZECODE_CRYPT_BAD_FORMAT;
+            }
         }
+
+        zzhex_print_data_hex("prikey", prikey, 32);
+
+        /* get public key */ {
+            size_t len;
+            ok = EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, NULL, 0, &len);
+            if (!ok) {
+                fprintf(log_output, "EVP_PKEY_get_octet_string_param failed\n");
+                EVP_PKEY_free(pkey);
+                return ZZECODE_CRYPT_SSL_ERR;
+            }
+            u8 *buf = malloc(len);
+            ok = EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, buf, len, &len);
+            if (!ok) {
+                fprintf(log_output, "EVP_PKEY_get_octet_string_param failed\n");
+                EVP_PKEY_free(pkey);
+                free(buf);
+                return ZZECODE_CRYPT_SSL_ERR;
+            }
+            // remove leading 0x04
+            if (len == 64) {
+                memcpy(pubkey, buf, 64);
+                free(buf);
+            } else if (len == 65 && buf[0] == 0x04) {
+                memcpy(pubkey, buf + 1, 64);
+                free(buf);
+            } else {
+                EVP_PKEY_free(pkey);
+                free(buf);
+                return ZZECODE_CRYPT_BAD_FORMAT;
+            }
+        }
+        zzhex_print_data_hex("pubkey", pubkey, 64);
+
+        EVP_PKEY_free(pkey);
     }
 
-    return ZZECODE_OK;
+    return zzcrypt_sm2_import_key(hdev, happ, prikey, pubkey);
 }
 
 /************************************************************

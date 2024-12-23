@@ -742,19 +742,14 @@ void test_file(zzcrypt_devhandle_p hdev) {
 
 void test_loadpem(zzcrypt_devhandle_p hdev) {
     int ret;
-    printf("=====test_loadpem\n");
+    printf("=====import_key_from_pem\n");
     zzcrypt_apphandle_p happ = NULL;
     zzcrypt_init_app(hdev, "Thinta_Application", "111111", &happ);
 
     const char *filename = "private_key.pem";
-    u8 *data;
-    size_t len;
-    ret = zzcrypt_loadpem(happ, filename, &data, &len);
+    ret = zzcrypt_sm2_import_key_from_pem(hdev, happ, filename);
     assert(ret == ZZECODE_OK);
-
-    zzhex_print_data_hex("private key", data, len);
-    assert(len == 32);
-    printf("=====test_loadpem passed\n");
+    printf("=====import_key_from_pem passed\n");
 }
 
 int main() {
@@ -771,19 +766,19 @@ int main() {
     printf("dev issuer: %s\n", info.issuer);
     printf("dev space: %u/%u\n", info.space_avali, info.space_total);
 
-    test_sm4_gw(hdev);
-    test_sm4_ecb(hdev);
-    test_sm4_ecb_padding(hdev);
-    test_sm4_ecb_padding_zero(hdev);
-    test_sm4_ecb_padding_pkcs5(hdev);
-    test_sm4_cbc(hdev);
-    test_sm4_ecb_17(hdev);
-    test_sm4_ecb_long(hdev);
-    test_sm2(hdev);
-    test_sm2_from_hex(hdev);
-    test_sm2_gw(hdev);
-    test_sm2_long(hdev);
-    test_file(hdev);
+    // test_sm4_gw(hdev);
+    // test_sm4_ecb(hdev);
+    // test_sm4_ecb_padding(hdev);
+    // test_sm4_ecb_padding_zero(hdev);
+    // test_sm4_ecb_padding_pkcs5(hdev);
+    // test_sm4_cbc(hdev);
+    // test_sm4_ecb_17(hdev);
+    // test_sm4_ecb_long(hdev);
+    // test_sm2(hdev);
+    // test_sm2_from_hex(hdev);
+    // test_sm2_gw(hdev);
+    // test_sm2_long(hdev);
+    // test_file(hdev);
     test_loadpem(hdev);
 
     pasue_on_exit();

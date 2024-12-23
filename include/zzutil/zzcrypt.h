@@ -89,6 +89,12 @@ int zzcrypt_release_app(zzcrypt_apphandle_t *happ);
 /// @return 错误代码, 0 表示成功
 int zzcrypt_sm2_import_key(const zzcrypt_devhandle_t *hdev, const zzcrypt_apphandle_t *happ, const uint8_t *prikey, const uint8_t *pubkey);
 
+/// @brief 从 PEM 文件中加载 SM2 密钥对
+/// @param[in] happ 应用句柄
+/// @param[in] filename PEM 文件名
+/// @return 错误代码, 0 表示成功
+int zzcrypt_sm2_import_key_from_pem(const zzcrypt_devhandle_t *hdev, const zzcrypt_apphandle_t *happ, const char *filename);
+
 /// @brief SM2 加密, 需要首先导入 SM2 密钥对
 /// @param[in] hdev 设备句柄
 /// @param[in] pubkey 公钥串(二进制表示)
@@ -199,7 +205,5 @@ int zzcrypt_removefile(const zzcrypt_apphandle_t *happ, const char *filename);
 int zzcrypt_devinfo(const zzcrypt_devhandle_t *hdev, zzcrypt_devinfo_t *info);
 
 int zzcrypt_appinfo(const zzcrypt_apphandle_t *happ, zzcrypt_appinfo_t *info);
-
-int zzcrypt_loadpem(const zzcrypt_apphandle_t *happ, const char *filename, uint8_t **data, size_t *len);
 
 #endif // ZZUTIL_ZZCRYPT_H
