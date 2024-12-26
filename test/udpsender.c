@@ -11,11 +11,11 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
-typedef zz_udp_socket_t udp_socket;
-typedef zz_ip_address_t ip_addr;
-typedef zz_mac_address_t mac_addr;
-typedef zz_udp_address_t udp_addr;
-typedef zz_adapter_info_t adapter_info;
+typedef zzmsg_udp_socket_t udp_socket;
+typedef zzmsg_ip_address_t ip_addr;
+typedef zzmsg_mac_address_t mac_addr;
+typedef zzmsg_udp_address_t udp_addr;
+typedef zzmsg_adapter_info_t adapter_info;
 
 int main(int agrc, char *agrv[]) {
     int ret;

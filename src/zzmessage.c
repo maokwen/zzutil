@@ -409,14 +409,14 @@ int zzmsg_get_all_interfaces(adapter_info **ifs, u32 *count) {
         }
         if (found == -1) {
             if (ifa->ifa_addr->sa_family == AF_INET) {
-                memset(info + if_i, 0 , sizeof(adapter_info));
+                memset(info + if_i, 0, sizeof(adapter_info));
                 info[if_i].name = strdup(ifa->ifa_name);
                 info[if_i].ip = (ip_addr *)malloc(1 * sizeof(ip_addr));
                 info[if_i].ip[0] = ipconv_unix2zz((struct sockaddr_in *)ifa->ifa_addr);
                 info[if_i].ip_count = 1;
                 if_i += 1;
             } else if (ifa->ifa_addr->sa_family == AF_PACKET) {
-                memset(info + if_i, 0 , sizeof(adapter_info));
+                memset(info + if_i, 0, sizeof(adapter_info));
                 info[if_i].name = strdup(ifa->ifa_name);
                 info[if_i].mac = macconv_unix2zz((struct sockaddr_ll *)ifa->ifa_addr);
                 if_i += 1;

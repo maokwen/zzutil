@@ -12,11 +12,11 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
-typedef zz_udp_socket_t udp_socket;
-typedef zz_ip_address_t ip_addr;
-typedef zz_mac_address_t mac_addr;
-typedef zz_udp_address_t udp_addr;
-typedef zz_adapter_info_t adapter_info;
+typedef zzmsg_udp_socket_t udp_socket;
+typedef zzmsg_ip_address_t ip_addr;
+typedef zzmsg_mac_address_t mac_addr;
+typedef zzmsg_udp_address_t udp_addr;
+typedef zzmsg_adapter_info_t adapter_info;
 
 bool starts_with(const char *str, const char *prefix) {
     size_t prefix_len = strlen(prefix);
@@ -30,11 +30,11 @@ bool starts_with(const char *str, const char *prefix) {
 int main(int agrc, char *agrv[]) {
     int ret;
 
-    zz_ip_address_t ip = {239, 255, 43, 21};
+    zzmsg_ip_address_t ip = {239, 255, 43, 21};
     u16 port = 30040;
-    zz_udp_address_t addr = {ip, port};
+    zzmsg_udp_address_t addr = {ip, port};
 
-    zz_udp_socket_t *socket = NULL;
+    zzmsg_udp_socket_t *socket = NULL;
 
     ret = zzmsg_init();
     if (ret) {

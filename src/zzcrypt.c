@@ -707,7 +707,7 @@ int zzcrypt_sm4_release(hkey_t *hkey) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_enumfiles(const happ_t *happ, char **filenames) {
+int zzcrypt_file_list(const happ_t *happ, char **filenames) {
     u32 ret;
     if (!happ->is_initialized) {
         return ZZECODE_NO_INIT;
@@ -742,7 +742,7 @@ int zzcrypt_enumfiles(const happ_t *happ, char **filenames) {
     return ZZECODE_OK;
 }
 
-int zzcrypt_writefile(const happ_t *happ, const char *filename, const u8 *data, size_t len) {
+int zzcrypt_file_write(const happ_t *happ, const char *filename, const u8 *data, size_t len) {
     u32 ret;
     if (!happ->is_initialized) {
         return ZZECODE_NO_INIT;
@@ -770,7 +770,7 @@ int zzcrypt_writefile(const happ_t *happ, const char *filename, const u8 *data, 
     return ZZECODE_OK;
 }
 
-int zzcrypt_readfile(const happ_t *happ, const char *filename, u8 **data, size_t *len) {
+int zzcrypt_file_read(const happ_t *happ, const char *filename, u8 **data, size_t *len) {
     u32 ret;
     if (!happ->is_initialized) {
         return ZZECODE_NO_INIT;
@@ -819,7 +819,7 @@ int zzcrypt_readfile(const happ_t *happ, const char *filename, u8 **data, size_t
     return ZZECODE_OK;
 }
 
-int zzcrypt_removefile(const happ_t *happ, const char *filename) {
+int zzcrypt_file_remove(const happ_t *happ, const char *filename) {
     u32 ret;
     if (!happ->is_initialized) {
         return ZZECODE_NO_INIT;
@@ -877,7 +877,7 @@ int zzcrypt_sm2_import_key_from_file(const hdev_t *hdev, const happ_t *happ, con
     size_t prikey_len;
 
     // read pem file to openssl bio
-    ret = zzcrypt_readfile(happ, filename, &prikey_pem, &prikey_len);
+    ret = zzcrypt_file_read(happ, filename, &prikey_pem, &prikey_len);
     if (ret != ZZECODE_OK) {
         return ret;
     }
@@ -1017,7 +1017,7 @@ int zzcrypt_sm2_get_pubkey_from_file(const hdev_t *hdev, const happ_t *happ, con
     u8 *crt_pem = NULL;
     size_t crt_len;
 
-    ret = zzcrypt_readfile(happ, filename, &crt_pem, &crt_len);
+    ret = zzcrypt_file_read(happ, filename, &crt_pem, &crt_len);
     if (ret != ZZECODE_OK) {
         return ret;
     }

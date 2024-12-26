@@ -714,27 +714,27 @@ void test_file(zzcrypt_devhandle_p hdev) {
     u8 *read_data;
     size_t read_len;
 
-    ret = zzcrypt_removefile(happ, filename);
+    ret = zzcrypt_file_remove(happ, filename);
     assert(ret == ZZECODE_OK || ret == ZZECODE_FILE_NOT_EXIST);
 
-    ret = zzcrypt_readfile(happ, filename, &read_data, &read_len);
+    ret = zzcrypt_file_read(happ, filename, &read_data, &read_len);
     assert(ret == ZZECODE_FILE_NOT_EXIST);
 
-    ret = zzcrypt_writefile(happ, filename, data, data_len);
+    ret = zzcrypt_file_write(happ, filename, data, data_len);
     assert(ret == ZZECODE_OK);
 
-    ret = zzcrypt_writefile(happ, filename, data, data_len);
+    ret = zzcrypt_file_write(happ, filename, data, data_len);
     assert(ret == ZZECODE_FILE_ALREADY_EXIST);
 
-    ret = zzcrypt_readfile(happ, filename, &read_data, &read_len);
+    ret = zzcrypt_file_read(happ, filename, &read_data, &read_len);
     assert(ret == ZZECODE_OK);
     assert(data_len == read_len);
     assert(memcmp(data, read_data, read_len) == 0);
 
-    ret = zzcrypt_removefile(happ, filename);
+    ret = zzcrypt_file_remove(happ, filename);
     assert(ret == ZZECODE_OK);
 
-    ret = zzcrypt_readfile(happ, filename, &read_data, &read_len);
+    ret = zzcrypt_file_read(happ, filename, &read_data, &read_len);
     assert(ret == ZZECODE_FILE_NOT_EXIST);
 
     printf("=====test_file passed\n");
@@ -787,7 +787,7 @@ void test_load_gw_pubkey(zzcrypt_devhandle_p hdev) {
     zzcrypt_init_app(hdev, "Thinta_Application", "111111", &happ);
 
     char *filenames;
-    ret = zzcrypt_enumfiles(happ, &filenames);
+    ret = zzcrypt_file_list(happ, &filenames);
     assert(ret == ZZECODE_OK);
     printf("filenames: %s\n", filenames);
 

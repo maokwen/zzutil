@@ -192,7 +192,7 @@ int zzcrypt_sm4_release(zzcrypt_keyhandle_t *hkey);
 /// @param[in] happ 应用句柄
 /// @param[out] filenames, split by comma
 /// @param[out] len
-int zzcrypt_enumfiles(const zzcrypt_apphandle_t *happ, char **filenames);
+int zzcrypt_file_list(const zzcrypt_apphandle_t *happ, char **filenames);
 
 /// @brief 写入文件
 /// @param[in] happ 应用句柄
@@ -200,7 +200,7 @@ int zzcrypt_enumfiles(const zzcrypt_apphandle_t *happ, char **filenames);
 /// @param[in] data
 /// @param[in] len
 /// @return 错误代码, 0 表示成功
-int zzcrypt_writefile(const zzcrypt_apphandle_t *happ, const char *filename, const uint8_t *data, size_t len);
+int zzcrypt_file_write(const zzcrypt_apphandle_t *happ, const char *filename, const uint8_t *data, size_t len);
 
 /// @brief 读取文件
 /// @param[in] happ 应用句柄
@@ -208,13 +208,13 @@ int zzcrypt_writefile(const zzcrypt_apphandle_t *happ, const char *filename, con
 /// @param[out] data
 /// @param[out] len
 /// @return 错误代码, 0 表示成功
-int zzcrypt_readfile(const zzcrypt_apphandle_t *happ, const char *filename, uint8_t **data, size_t *len);
+int zzcrypt_file_read(const zzcrypt_apphandle_t *happ, const char *filename, uint8_t **data, size_t *len);
 
 /// @brief 删除文件
 /// @param[in] happ
 /// @param[in] filename
 /// @return 错误代码, 0 表示成功
-int zzcrypt_removefile(const zzcrypt_apphandle_t *happ, const char *filename);
+int zzcrypt_file_remove(const zzcrypt_apphandle_t *happ, const char *filename);
 
 int zzcrypt_devinfo(const zzcrypt_devhandle_t *hdev, zzcrypt_devinfo_t *info);
 
