@@ -645,11 +645,6 @@ int zzcrypt_sm4_decrypt_pop(hkey_t *hkey, u8 **enc_data, size_t *enc_len) {
 
     u32 new_size;
 
-    printf("....... decrypted data: \n");
-    for (size_t i = 0; i < hkey->data_len; i++) {
-        printf("%02X ", hkey->buf[i]);
-    }
-
     // remove padding data
     if (hkey->padding_type == zzcrypt_padding_zero) {
         new_size = unpadding_zero(hkey);
@@ -984,9 +979,9 @@ int zzcrypt_sm2_import_key_from_file(const hdev_t *hdev, const happ_t *happ, con
             EVP_PKEY_free(pkey);
             return ZZECODE_CRYPT_SSL_ERR;
         }
-        for (size_t i = 0; params[i].key != 0; ++i) {
-            printf("%s: %d\n", params[i].key, params[i].data_type);
-        }
+        // for (size_t i = 0; params[i].key != 0; ++i) {
+        //     printf("%s: %d\n", params[i].key, params[i].data_type);
+        // }
 #endif
 
         /* get private key */ {
@@ -1103,9 +1098,9 @@ int zzcrypt_sm2_get_pubkey_from_file(const hdev_t *hdev, const happ_t *happ, con
 #ifdef ZZUTIL_DEBUG
         const OSSL_PARAM *params = EVP_PKEY_gettable_params(pkey);
 
-        for (size_t i = 0; params[i].key != 0; ++i) {
-            printf("%s: %d\n", params[i].key, params[i].data_type);
-        }
+        // for (size_t i = 0; params[i].key != 0; ++i) {
+        //     printf("%s: %d\n", params[i].key, params[i].data_type);
+        // }
 #endif
 
         /* get public key */ {
@@ -1323,7 +1318,6 @@ size_t padding_pkcs7(hkey_t *hkey) {
         }
     }
     hkey->padding_buf[remain] = remain + 1;
-    printf("padding: %d\n", remain + 1);
     return remain + 1;
 }
 
@@ -1352,9 +1346,6 @@ size_t unpadding_pkcs7(hkey_t *hkey) {
     u8 *p = hkey->buf + hkey->data_len - 1;
     u32 remain = *p;
     if (remain > block_size) {
-        printf("data_len: %d", hkey->data_len);
-        printf("block_size: %d\n", block_size);
-        printf("remain: %d\n", remain);
         LOG("unpadding_pkcs7: padding size is greater than block_size\n");
         return 0;
     }
