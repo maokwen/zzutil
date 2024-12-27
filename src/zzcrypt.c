@@ -1316,13 +1316,13 @@ size_t padding_pkcs7(hkey_t *hkey) {
     u32 block_size = hkey->block_size;
     u32 len = hkey->src_len + 1; // last byte must be padding size
     u32 remain = block_size - (len % block_size);
+    hkey->padding_buf = malloc(remain + 1);
     if (remain != 0) {
-        hkey->padding_buf = malloc(remain + 1);
         for (u32 i = 0; i < remain - 1; i++) {
             hkey->padding_buf[i] = rand_none_zero_byte();
         }
-        hkey->padding_buf[remain] = remain + 1;
     }
+    hkey->padding_buf[remain] = remain + 1;
     printf("padding: %d\n", remain + 1);
     return remain + 1;
 }
