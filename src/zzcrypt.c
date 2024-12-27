@@ -52,6 +52,12 @@ static size_t padding_pkcs7(hkey_t *hkey);
 static size_t unpadding_zero(hkey_t *hkey);
 static size_t unpadding_pkcs7(hkey_t *hkey);
 static u8 *datdat(const u8 *dat1, size_t len1, const u8 *dat2, size_t len2);
+static bool get_exec_path(char *buf, size_t len);
+static bool check_boot_from_usb();
+
+#define LOG(fmt, ...) \
+    if (log_output)   \
+    fprintf(log_output, (fmt), ##__VA_ARGS__)
 
 /************************************************************
  * Public functions
@@ -60,6 +66,8 @@ static u8 *datdat(const u8 *dat1, size_t len1, const u8 *dat2, size_t len2);
 struct _zzcrypt_devhandle {
     skf_handle_t skf_handle;
     bool is_initialized;
+    char ukey_path[256];
+    char exec_path[256];
 };
 
 struct _zzcrypt_keyhandle {
@@ -91,7 +99,8 @@ struct _zzcrypt_ctnhandle {
 
 int zzcrypt_init(hdev_t **hdev, FILE *log) {
     int ret;
-    char devices[128] = {0};
+    char devices[512] = {0};
+    char exec_path[512] = {0};
     char app_name_buf[128];
     u32 devices_size = sizeof(devices);
 
@@ -105,8 +114,8 @@ int zzcrypt_init(hdev_t **hdev, FILE *log) {
         return ZZECODE_CRYPT_ALREADY_INIT;
     }
 
-    if (!load_library() && log_output) {
-        fprintf(log_output, "Load library failed\n");
+    if (!load_library()) {
+        LOG("failed to load library");
         return ZZECODE_OS_ERROR;
     }
 
@@ -130,37 +139,8 @@ int zzcrypt_init(hdev_t **hdev, FILE *log) {
         return ZZECODE_CRYPT_NO_DEVICE;
     }
 
-    char *devname = strdup((char *)devices);
-    if (log_output) {
-        fprintf(log_output, "Device name: %s\n", devname);
-    }
-
-    /* check cwd */
-#ifndef ZZUTIL_DEBUG
-#ifdef _WIN32
-    char path[MAX_PATH];
-    P_SKF_GetFuncList GetFunction = NULL;
-    GetModuleFileName(NULL, path, MAX_PATH);
-    if (devices[0] != path[0]) {
-        if (log_output) {
-            fprintf(log_output, "path: %s\n", path);
-            fprintf(log_output, "devices: %s\n", devices);
-        }
-        return ZZECODE_CRYPT_WRONG_LOAD_POSITION;
-    }
-#endif
-#ifdef _UNIX
-    char path[128];
-    getcwd(path, sizeof(path));
-    if (true) {
-        if (log_output) {
-            fprintf(log_output, "path: %s\n", path);
-            fprintf(log_output, "devices: %s\n", devices);
-        }
-        return ZZECODE_CRYPT_WRONG_LOAD_POSITION;
-    }
-#endif
-#endif
+    strncpy(h->exec_path, exec_path, strlen(h->exec_path));
+    strncpy(h->ukey_path, devices, strlen(h->ukey_path));
 
     /* connect device */
     ret = FunctionList->SKF_ConnectDev(devices, &h->skf_handle);
@@ -665,6 +645,11 @@ int zzcrypt_sm4_decrypt_pop(hkey_t *hkey, u8 **enc_data, size_t *enc_len) {
 
     u32 new_size;
 
+    printf("....... decrypted data: \n");
+    for (size_t i = 0; i < hkey->data_len; i++) {
+        printf("%02X ", hkey->buf[i]);
+    }
+
     // remove padding data
     if (hkey->padding_type == zzcrypt_padding_zero) {
         new_size = unpadding_zero(hkey);
@@ -871,6 +856,68 @@ int zzcrypt_appinfo(const happ_t *happ, zzcrypt_appinfo_t *info) {
     return ZZECODE_OK;
 }
 
+int zzcrypt_boot_from_dev(const hdev_t *hdev) {
+    u32 ret;
+    if (!hdev->is_initialized) {
+        return ZZECODE_NO_INIT;
+    }
+
+    // windows: check label: ukey_path[0] == exec_path[0]
+    if (hdev->ukey_path[0] == hdev->exec_path[0]) {
+        return ZZECODE_OK;
+    }
+
+    // linux: udevadm info /dev/sg0
+    char exec_dev_path[2048];
+    char ukey_dev_path[2048];
+    char buf[2048];
+
+    /* 1. get exec dev info */ {
+        /* get mount point */ {
+            strncpy(buf, "df -P ", sizeof(buf));
+            strncat(buf, hdev->exec_path, sizeof(buf) - strlen(buf) - 1);
+            FILE *fp = popen(buf, "r");
+            if (fp == NULL) {
+                return ZZECODE_OS_ERROR;
+            }
+            if (fgets(exec_dev_path, sizeof(buf), fp) == NULL) {
+                pclose(fp);
+                return ZZECODE_OS_ERROR;
+            }
+        }
+        strncpy(buf, "udevadm info ", sizeof(buf));
+        strncat(buf, exec_dev_path, sizeof(buf) - strlen(buf) - 1);
+        strncat(buf, "| grep -x \"P: .*\" -m 1", sizeof(buf) - strlen(buf) - 1);
+        FILE *fp = popen(buf, "r");
+        if (fp == NULL) {
+            return ZZECODE_OS_ERROR;
+        }
+        if (fgets(ukey_dev_path, sizeof(buf), fp) == NULL) {
+            pclose(fp);
+            return ZZECODE_OS_ERROR;
+        }
+    }
+    /* 2. get ukey dev info */ {
+        strncpy(buf, "udevadm info ", sizeof(buf));
+        strncat(buf, hdev->ukey_path, sizeof(buf) - strlen(buf) - 1);
+        strncat(buf, "| grep -x \"P: .*\" -m 1", sizeof(buf) - strlen(buf) - 1);
+        FILE *fp = popen(buf, "r");
+        if (fp == NULL) {
+            return ZZECODE_OS_ERROR;
+        }
+        if (fgets(ukey_dev_path, sizeof(buf), fp) == NULL) {
+            pclose(fp);
+            return ZZECODE_OS_ERROR;
+        }
+    }
+
+    FILE *fp = popen(buf, "r");
+
+    LOG("device ");
+
+    return ZZECODE_CRYPT_WRONG_LOAD_POSITION;
+}
+
 int zzcrypt_sm2_import_key_from_file(const hdev_t *hdev, const happ_t *happ, const char *filename, u8 **prikey_out) {
     int ret;
     u8 *prikey_pem = NULL;
@@ -915,13 +962,13 @@ int zzcrypt_sm2_import_key_from_file(const hdev_t *hdev, const happ_t *happ, con
         BIO *mem = BIO_new_mem_buf(prikey_pem, prikey_len);
         if (mem == NULL) {
             free(prikey_pem);
-            fprintf(log_output, "BIO_new_mem_buf failed\n");
+            LOG("BIO_new_mem_buf failed\n");
             return ZZECODE_CRYPT_SSL_ERR;
         }
 
         EVP_PKEY *pkey = PEM_read_bio_PrivateKey(mem, NULL, 0, NULL);
         if (pkey == NULL) {
-            fprintf(log_output, "PEM_read_bio_PrivateKey failed\n");
+            LOG("PEM_read_bio_PrivateKey failed\n");
             free(prikey_pem);
             BIO_free(mem);
             return ZZECODE_CRYPT_SSL_ERR;
@@ -933,7 +980,7 @@ int zzcrypt_sm2_import_key_from_file(const hdev_t *hdev, const happ_t *happ, con
 #ifdef ZZUTIL_DEBUG
         const OSSL_PARAM *params = EVP_PKEY_gettable_params(pkey);
         if (!params) {
-            fprintf(log_output, "EVP_PKEY_gettable_params failed\n");
+            LOG("EVP_PKEY_gettable_params failed\n");
             EVP_PKEY_free(pkey);
             return ZZECODE_CRYPT_SSL_ERR;
         }
@@ -946,7 +993,7 @@ int zzcrypt_sm2_import_key_from_file(const hdev_t *hdev, const happ_t *happ, con
             BIGNUM *bn = NULL;
             ok = EVP_PKEY_get_bn_param(pkey, OSSL_PKEY_PARAM_PRIV_KEY, &bn);
             if (!ok) {
-                fprintf(log_output, "EVP_PKEY_get_bn_param failed\n");
+                LOG("EVP_PKEY_get_bn_param failed\n");
                 EVP_PKEY_free(pkey);
                 return ZZECODE_CRYPT_SSL_ERR;
             }
@@ -954,7 +1001,7 @@ int zzcrypt_sm2_import_key_from_file(const hdev_t *hdev, const happ_t *happ, con
             u8 *buf = malloc(len);
             len = BN_bn2bin(bn, buf);
             if (len == 0) {
-                fprintf(log_output, "BN_bn2bin failed\n");
+                LOG("BN_bn2bin failed\n");
                 EVP_PKEY_free(pkey);
                 free(buf);
                 return ZZECODE_CRYPT_SSL_ERR;
@@ -973,14 +1020,14 @@ int zzcrypt_sm2_import_key_from_file(const hdev_t *hdev, const happ_t *happ, con
             size_t len;
             ok = EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, NULL, 0, &len);
             if (!ok) {
-                fprintf(log_output, "EVP_PKEY_get_octet_string_param failed\n");
+                LOG("EVP_PKEY_get_octet_string_param failed\n");
                 EVP_PKEY_free(pkey);
                 return ZZECODE_CRYPT_SSL_ERR;
             }
             u8 *buf = malloc(len);
             ok = EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, buf, len, &len);
             if (!ok) {
-                fprintf(log_output, "EVP_PKEY_get_octet_string_param failed\n");
+                LOG("EVP_PKEY_get_octet_string_param failed\n");
                 EVP_PKEY_free(pkey);
                 free(buf);
                 return ZZECODE_CRYPT_SSL_ERR;
@@ -1029,13 +1076,13 @@ int zzcrypt_sm2_get_pubkey_from_file(const hdev_t *hdev, const happ_t *happ, con
         BIO *mem = BIO_new_mem_buf(crt_pem, crt_len);
         if (mem == NULL) {
             free(crt_pem);
-            fprintf(log_output, "BIO_new_mem_buf failed\n");
+            LOG("BIO_new_mem_buf failed\n");
             return ZZECODE_CRYPT_SSL_ERR;
         }
 
         X509 *x509 = PEM_read_bio_X509(mem, NULL, 0, NULL);
         if (x509 == NULL) {
-            fprintf(log_output, "PEM_read_bio_X509 failed\n");
+            LOG("PEM_read_bio_X509 failed\n");
             free(crt_pem);
             BIO_free(mem);
             return ZZECODE_CRYPT_SSL_ERR;
@@ -1046,7 +1093,7 @@ int zzcrypt_sm2_get_pubkey_from_file(const hdev_t *hdev, const happ_t *happ, con
 
         EVP_PKEY *pkey = X509_get_pubkey(x509);
         if (pkey == NULL) {
-            fprintf(log_output, "X509_get_pubkey failed\n");
+            LOG("X509_get_pubkey failed\n");
             X509_free(x509);
             return ZZECODE_CRYPT_SSL_ERR;
         }
@@ -1065,14 +1112,14 @@ int zzcrypt_sm2_get_pubkey_from_file(const hdev_t *hdev, const happ_t *happ, con
             size_t len;
             ok = EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, NULL, 0, &len);
             if (!ok) {
-                fprintf(log_output, "EVP_PKEY_get_octet_string_param failed\n");
+                LOG("EVP_PKEY_get_octet_string_param failed\n");
                 EVP_PKEY_free(pkey);
                 return ZZECODE_CRYPT_SSL_ERR;
             }
             u8 *buf = malloc(len);
             ok = EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, buf, len, &len);
             if (!ok) {
-                fprintf(log_output, "EVP_PKEY_get_octet_string_param failed\n");
+                LOG("EVP_PKEY_get_octet_string_param failed\n");
                 EVP_PKEY_free(pkey);
                 free(buf);
                 return ZZECODE_CRYPT_SSL_ERR;
@@ -1108,15 +1155,14 @@ int zzcrypt_sm2_get_pubkey_from_file(const hdev_t *hdev, const happ_t *happ, con
 bool load_library() {
     int ret = 0;
     void *lib_handle = NULL;
-    char path[128] = {0};
+    char path[512] = {0};
 
-#ifdef _WIN32
-    P_SKF_GetFuncList GetFunction = NULL;
-    GetModuleFileName(NULL, path, MAX_PATH);
-    u8 *p = strrchr(path, '\\');
-    if (p) {
-        *p = 0;
+    if (!get_exec_path(path, 512)) {
+        return false;
     }
+
+    P_SKF_GetFuncList get_func_list = NULL;
+#ifdef _WIN32
 #ifdef _WIN64
     strcat_s(path, sizeof(path), "\\SKF_ukey_x86_64_1.7.22.0117.dll");
 #else
@@ -1126,42 +1172,35 @@ bool load_library() {
     if (lib_handle == NULL) {
         ret = GetLastError();
         if (log_output) {
-            fprintf(log_output, "Failed to load dll %s (error %d)\n", path, ret);
+            LOG("LoadLibrary error: %d\n", ret);
         }
         return false;
     }
-    GetFunction = (P_SKF_GetFuncList)GetProcAddress(lib_handle, "SKF_GetFuncList");
-    if (GetFunction == NULL) {
+    get_func_list = (P_SKF_GetFuncList)GetProcAddress(lib_handle, "SKF_GetFuncList");
+    if (get_func_list == NULL) {
         ret = GetLastError();
+        LOG("GetProcAddress error: %d", ret);
         return false;
     }
-    ret = GetFunction(&FunctionList);
-    if (ret) {
-        return false;
-    }
-#else
-    P_SKF_GetFuncList get_func_list;
-
-    getcwd(path, sizeof(path));
+#elif _UNIX
     strcat(path, "/libskf.so");
     lib_handle = dlopen(path, RTLD_LAZY);
     if (!lib_handle) {
-        fprintf(log_output, "Open Error:%s.\n", dlerror());
+        LOG("dlopen error: %s.\n", dlerror());
         return false;
     }
 
     get_func_list = dlsym(lib_handle, "SKF_GetFuncList");
     if (get_func_list == NULL) {
-        fprintf(log_output, "Dlsym Error:%s.\n", dlerror());
-        return false;
-    }
-
-    ret = get_func_list(&FunctionList);
-    if (ret) {
-        fprintf(log_output, "fnGetList ERROR 0x%x", ret);
+        LOG("dlsym error: %s.\n", dlerror());
         return false;
     }
 #endif
+
+    ret = get_func_list(&FunctionList);
+    if (ret) {
+        return false;
+    }
 
     return true;
 }
@@ -1173,18 +1212,33 @@ size_t sm2_sizeof_encoded_data(size_t cipher_len) {
 void print_device_info(skf_handle_t hdev) {
     int ret = 0;
     DEVINFO info;
+    char devices[256];
+    char exec_path[256];
+    u32 devices_size;
 
     memset(&info, 0, sizeof(info));
     ret = FunctionList->SKF_GetDevInfo(hdev, &info);
     if (ret) {
-        fprintf(log_output, "SKF_GetDevInfo() failed: %#x\n", ret);
+        LOG("SKF_GetDevInfo() failed: %#x\n", ret);
         return;
     }
 
-    fprintf(log_output, "SerialNumber: %s\n", info.SerialNumber);
-    fprintf(log_output, "DevAuthAlgId: 0x%x\n", info.DevAuthAlgId);
-    fprintf(log_output, "TotalSpace: %d\n", info.TotalSpace);
-    fprintf(log_output, "FreeSpace: %d\n", info.FreeSpace);
+    int device_count;
+    {
+        int idx = 0;
+        char *p = devices;
+        size_t pos = 0;
+        while (pos < devices_size) {
+            LOG("device[%d]: %s\n", idx++, p);
+            pos += strlen(p) + 1;
+        }
+        device_count = idx;
+    }
+
+    LOG("SerialNumber: %s\n", info.SerialNumber);
+    LOG("DevAuthAlgId: 0x%x\n", info.DevAuthAlgId);
+    LOG("TotalSpace: %d\n", info.TotalSpace);
+    LOG("FreeSpace: %d\n", info.FreeSpace);
 }
 
 bool skf_error(const char *msg, int ret) {
@@ -1192,7 +1246,7 @@ bool skf_error(const char *msg, int ret) {
         return false;
     } else {
         if (log_output) {
-            fprintf(log_output, "%s failed: 0x%08x\n", msg, ret);
+            LOG("%s failed: 0x%08x\n", msg, ret);
         }
         return true;
     }
@@ -1263,13 +1317,14 @@ size_t padding_pkcs7(hkey_t *hkey) {
     u32 len = hkey->src_len + 1; // last byte must be padding size
     u32 remain = block_size - (len % block_size);
     if (remain != 0) {
-        hkey->padding_buf = malloc(remain);
+        hkey->padding_buf = malloc(remain + 1);
         for (u32 i = 0; i < remain - 1; i++) {
             hkey->padding_buf[i] = rand_none_zero_byte();
         }
-        hkey->padding_buf[remain - 1] = remain;
+        hkey->padding_buf[remain] = remain + 1;
     }
-    return remain;
+    printf("padding: %d\n", remain + 1);
+    return remain + 1;
 }
 
 size_t unpadding_zero(hkey_t *hkey) {
@@ -1280,7 +1335,7 @@ size_t unpadding_zero(hkey_t *hkey) {
     // get last block
     u8 *p = hkey->buf + hkey->data_len - 1;
     u32 remain = 0;
-    while (remain < block_size && *p == 0) {
+    while (remain < block_size && *p == 0x00) {
         remain += 1;
         p -= 1;
     }
@@ -1290,12 +1345,17 @@ size_t unpadding_zero(hkey_t *hkey) {
 size_t unpadding_pkcs7(hkey_t *hkey) {
     u32 block_size = hkey->block_size;
     if (hkey->data_len % block_size != 0) {
+        LOG("unpadding_pkcs7: data_len is not multiple of block_size\n");
         return 0;
     }
     // get last byte
     u8 *p = hkey->buf + hkey->data_len - 1;
     u32 remain = *p;
     if (remain > block_size) {
+        printf("data_len: %d", hkey->data_len);
+        printf("block_size: %d\n", block_size);
+        printf("remain: %d\n", remain);
+        LOG("unpadding_pkcs7: padding size is greater than block_size\n");
         return 0;
     }
     // check padding
@@ -1309,4 +1369,24 @@ u8 *datdat(const u8 *dat1, size_t len1, const u8 *dat2, size_t len2) {
         }
     }
     return NULL;
+}
+
+bool get_exec_path(char *buf, size_t len) {
+#ifdef _WIN32
+    char path[MAX_PATH];
+    GetModuleFileName(NULL, path, MAX_PATH);
+    u8 *p = strrchr(path, '\\');
+    if (p) {
+        *p = 0;
+    }
+#elif _UNIX
+    char path[512];
+    getcwd(path, sizeof(path));
+#endif
+    if (strlen(path) < len) {
+        strcpy(buf, path);
+        return true;
+    } else {
+        return false;
+    }
 }

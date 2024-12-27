@@ -259,31 +259,29 @@ int zzmsg_recv_udp(const udp_socket *sock, udp_addr *addr, u8 *buf, u32 len, u32
         printf("recvfrom() failed\n");
         return ZZECODE_OS_ERROR;
     }
-    if (bytes_received == len - 1) {
+    if (bytes_received == len) {
         printf("buffer is too small\n");
         return ZZECODE_BUFFER_TOO_SMALL;
     }
 
-    buf[bytes_received] = '\0';
-    *receive_len = bytes_received + 1;
+    *receive_len = bytes_received;
     *addr = addrconv_win2zz(from);
 #endif
 
 #ifdef _UNIX
     struct sockaddr_in from;
-    int from_len = sizeof(struct sockaddr_in);
+    socklen_t from_len = sizeof(struct sockaddr_in);
     int bytes_received = recvfrom(*(int *)(sock->sock_ptr), buf, len - 1, 0, (struct sockaddr *)&from, &from_len);
     if (bytes_received <= 0) {
         printf("recvfrom() failed\n");
         return ZZECODE_OS_ERROR;
     }
-    if (bytes_received == len - 1) {
+    if (bytes_received == len) {
         printf("buffer is too small\n");
         return ZZECODE_BUFFER_TOO_SMALL;
     }
 
-    buf[bytes_received] = '\0';
-    *receive_len = bytes_received + 1;
+    *receive_len = bytes_received;
     *addr = addrconv_unix2zz(from);
 #endif
 
