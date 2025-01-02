@@ -55,9 +55,11 @@ static u8 *datdat(const u8 *dat1, size_t len1, const u8 *dat2, size_t len2);
 static bool get_exec_path(char *buf, size_t len);
 static bool check_boot_from_usb();
 
-#define LOG(fmt, ...) \
-    if (log_output)   \
-    fprintf(log_output, (fmt), ##__VA_ARGS__)
+#define LOG(fmt, ...)                              \
+    if (log_output) {                              \
+        fprintf(log_output, "zzcrypt ");           \
+        fprintf(log_output, (fmt), ##__VA_ARGS__); \
+    }
 
 /************************************************************
  * Public functions
@@ -153,7 +155,7 @@ int zzcrypt_init(hdev_t **hdev, FILE *log) {
     }
 
     /* enmu all app */
-    int len = sizeof(app_name_buf);
+    u32 len = sizeof(app_name_buf);
     ret = FunctionList->SKF_EnumApplication((*hdev)->skf_handle, app_name_buf, &len);
     if (skf_error("SKF_EnumApplication", ret)) {
         return ZZECODE_SKF_ERR;
@@ -206,7 +208,7 @@ int zzcrypt_init_app(const hdev_t *hdev, const char *app_name, const char *pin, 
     return ZZECODE_OK;
 }
 
-int zzcrypr_release_app(happ_t *happ) {
+int zzcrypt_release_app(happ_t *happ) {
     if (happ == NULL) {
         return ZZECODE_DOUBLE_RELEASE;
     }
@@ -250,7 +252,7 @@ int zzcrypt_sm2_import_key(const hdev_t *hdev, const happ_t *happ, const u8 *pri
     }
 
     // 2. get the pubkey form ukey, copy pubkey to env
-    int ctn_type = 0;
+    u32 ctn_type = 0;
     ret = FunctionList->SKF_GetContainerType(hctn, &ctn_type);
     if (skf_error("SKF_GetContainerType", ret)) {
         return ZZECODE_SKF_ERR;
@@ -742,7 +744,7 @@ int zzcrypt_file_write(const happ_t *happ, const char *filename, const u8 *data,
         return ZZECODE_SKF_ERR;
     }
 
-    ret = FunctionList->SKF_WriteFile(happ->skf_handle, (char *)filename, 0, (char *)data, len);
+    ret = FunctionList->SKF_WriteFile(happ->skf_handle, (char *)filename, 0, (u8 *)data, len);
     if (skf_error("SKF_WriteFile()", ret)) {
         return ZZECODE_SKF_ERR;
     }

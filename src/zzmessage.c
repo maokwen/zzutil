@@ -607,6 +607,5 @@ int set_socket_if(const udp_socket *sock, ip_addr ip) {
     }
 #endif
 
-    printf("setsockopt(if) success\n");
     return ZZECODE_OK;
 }
