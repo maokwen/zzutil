@@ -13,7 +13,7 @@
 #include <libswscale/swscale.h>
 
 #ifndef MK_DEBUG
-#define DEBUG_DIABLE if (false)
+#define DEBUG_DIABLE if (true)
 #endif
 
 #define ERR_SIZE 256
@@ -26,6 +26,7 @@
     }
 
 typedef struct zzcapture_handle_ hcap_t;
+typedef struct zzcapture_param parm_t;
 
 struct zzcapture_handle_ {
     bool is_initialized;
@@ -182,7 +183,7 @@ int init_input(hcap_t *hcap) {
     return ZZECODE_OK;
 }
 
-int init_output(hcap_t *hcap) {
+int init_output(hcap_t *hcap, const parm_t *parm) {
     int ret;
 
     const AVOutputFormat *ofmt = av_guess_format("mpegts", NULL, NULL);
@@ -202,9 +203,9 @@ int init_output(hcap_t *hcap) {
     AVCodecParameters *ocodec_par = avcodec_parameters_alloc();
     {
         ocodec_par->codec_id = AV_CODEC_ID_H264;
-        ocodec_par->width = 16 * 100;
-        ocodec_par->height = 9 * 100;
-        ocodec_par->bit_rate = 40000;
+        ocodec_par->height = parm->height;
+        ocodec_par->width = parm->width;
+        ocodec_par->bit_rate = parm->bit_rate;
         ocodec_par->codec_type = AVMEDIA_TYPE_VIDEO;
         ocodec_par->format = AV_PIX_FMT_YUV420P;
     }
@@ -295,7 +296,7 @@ int init_scale(hcap_t *hcap) {
     return ZZECODE_OK;
 }
 
-int init(hcap_t **hcap) {
+int init(hcap_t **hcap, const parm_t *parm) {
     int ret;
 
     // regidter all devices
@@ -321,15 +322,15 @@ int init(hcap_t **hcap) {
     }
 
     // 2. initialize output format & codec context
-    ret = init_output(h);
+    ret = init_output(h, parm);
     if (ret != ZZECODE_OK) {
         free_hcap(h);
         return ret;
     }
 
     /* dump format */ DEBUG_DIABLE {
-        av_dump_format(ifmt_ctx, 0, NULL, 0);
-        av_dump_format(ofmt_ctx, 0, NULL, 1);
+        // av_dump_format(ifmt_ctx, 0, NULL, 0);
+        // av_dump_format(ofmt_ctx, 0, NULL, 1);
     }
 
     // 3. initialize freame buffer
@@ -437,9 +438,9 @@ int get_ts_packet(const hcap_t *hcap, uint8_t **data, size_t *len) {
 
 // exports
 
-int zzcapture_init(zzcapture_handle_t **hcap, FILE *log) {
+int zzcapture_init(zzcapture_handle_t **hcap, const zzcapture_param_t *param, FILE *log) {
     log_output = log;
-    return init(hcap);
+    return init(hcap, param);
 }
 
 int zzcapture_get_ts_packet(const zzcapture_handle_t *hcap, uint8_t **data, size_t *len) {

@@ -21,17 +21,17 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_LIST_DIR}/build")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_LIST_DIR}/build")
 
 if(WIN32)
-  add_definitions(-D_WIN32)
-  add_definitions(-D_WIN32_WINNT=0x0600) # Windows Vista and up
-  add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-  add_definitions(-D_CRT_NONSTDC_NO_DEPRECATE)
-  if(MINGW)
-    add_definitions(-D_MINGW)
-  endif()
+    add_definitions(-D_WIN32)
+    add_definitions(-D_WIN32_WINNT=0x0600) # Windows Vista and up
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    add_definitions(-D_CRT_NONSTDC_NO_DEPRECATE)
+    if(MINGW)
+        add_definitions(-D_MINGW)
+    endif()
 endif()
 
 if(UNIX)
-  add_definitions(-D_UNIX)
+    add_definitions(-D_UNIX)
 endif()
 
 add_compile_definitions($<$<CONFIG:Debug>:ZZUTIL_DEBUG>
@@ -42,6 +42,13 @@ add_compile_definitions($<$<CONFIG:Debug>:ZZUTIL_DEBUG>
 set(OPENSSL_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/openssl")
 set(OPENSSL_USE_STATIC_LIBS TRUE)
 find_package(OpenSSL REQUIRED)
+
+# set(FFMPEG_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg")
+# set(FFMPEG_USE_STATIC_LIBS TRUE)
+# find_package(FFmpeg REQUIRED)
+
+include(depends/ffmpeg.cmake)
+
 get_property(
   importTargets
   DIRECTORY "${CMAKE_SOURCE_DIR}"
@@ -88,19 +95,19 @@ target_include_directories(
 target_link_libraries(zzcrypt PRIVATE zzcommon OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
-  add_custom_command(
+    add_custom_command(
     OUTPUT ${PROJECT_BINARY_DIR}/skf.dll
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:skf>
             ${PROJECT_BINARY_DIR}/skf.dll
     COMMENT "Copying dll to build directory")
-  add_custom_target(skf_runtime DEPENDS ${PROJECT_BINARY_DIR}/skf.dll)
+    add_custom_target(skf_runtime DEPENDS ${PROJECT_BINARY_DIR}/skf.dll)
 elseif(UNIX)
-  add_custom_command(
+    add_custom_command(
     OUTPUT ${PROJECT_BINARY_DIR}/libskf.so
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:skf>
             ${PROJECT_BINARY_DIR}/libskf.so
     COMMENT "Copying so to build directory")
-  add_custom_target(skf_runtime DEPENDS ${PROJECT_BINARY_DIR}/libskf.so)
+    add_custom_target(skf_runtime DEPENDS ${PROJECT_BINARY_DIR}/libskf.so)
 endif()
 add_dependencies(zzcrypt skf_runtime)
 
@@ -116,10 +123,12 @@ target_include_directories(
                    $<INSTALL_INTERFACE:include>)
 
 if(WIN32)
-  set(ZZMESSAGE_ADDITIONAL_LIBS wsock32 ws2_32 iphlpapi)
+    set(ZZMESSAGE_ADDITIONAL_LIBS wsock32 ws2_32 iphlpapi)
 endif(WIN32)
 
 target_link_libraries(zzmessage PRIVATE zzcommon ${ZZMESSAGE_ADDITIONAL_LIBS})
+
+add_library(zzutil::zzmessage ALIAS zzmessage)
 
 # ====== cache
 
@@ -133,13 +142,34 @@ target_include_directories(
                  $<INSTALL_INTERFACE:include>)
 
 if(UNIX)
-  set(ZZCACHE_ADDITIONAL_LIBS pthread)
+    set(ZZCACHE_ADDITIONAL_LIBS pthread)
 endif()
 
 target_link_libraries(zzcache PRIVATE zzcommon ${ZZCACHE_ADDITIONAL_LIBS})
 
-add_library(zzutil::zzmessage ALIAS zzmessage)
 add_library(zzutil::zzcache ALIAS zzcache)
+
+# ====== capture
+
+add_library(zzcapture SHARED src/zzcapture.c)
+set_property(TARGET zzcapture PROPERTY VERSION ${version})
+set_property(TARGET zzcapture PROPERTY SOVERSION 0)
+set_property(TARGET zzcapture PROPERTY INTERFACE_zzcapture_MAJOR_VERSION 1)
+
+target_include_directories(
+  zzcapture PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+                   $<INSTALL_INTERFACE:include>)
+
+target_link_libraries(zzcapture PRIVATE
+    ffmpeg::avformat # should before avcodec for `av_bitstream_filter_filter`
+    ffmpeg::avcodec
+    ffmpeg::avdevice
+    ffmpeg::avutil
+    ffmpeg::swscale
+    ${ZZCAPTURE_ADDITIONAL_LIBS}
+)
+
+add_library(zzutil::zzcapture ALIAS zzcapture)
 
 # ====== Cross compile
 
@@ -162,7 +192,7 @@ set(CMAKE_INSTALL_PREFIX
     ${CMAKE_CURRENT_LIST_DIR}/../ZZMaintenanceTool/lib/zzutil)
 
 install(
-  TARGETS zzhex zzcrypt zzmessage zzcache
+  TARGETS zzhex zzcrypt zzmessage zzcache zzcapture
   EXPORT zzutil-targets
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
@@ -194,7 +224,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/zzutil-config.cmake
         DESTINATION lib/cmake/zzutil)
 
 if(WIN32)
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/skf.dll DESTINATION bin)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/skf.dll DESTINATION bin)
 elseif(UNIX)
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libskf.so DESTINATION bin)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libskf.so DESTINATION bin)
 endif()

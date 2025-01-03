@@ -7,6 +7,11 @@ int main() {
     int ret;
     int frame_size = 200;
     zzcapture_handle_t *hcap;
+    zzcapture_param_t param = {
+        .bit_rate = 40000,
+        .height = 9 * 80,
+        .width = 16 * 80,
+    };
     u8 *data;
     size_t len;
     FILE *fp;
@@ -14,7 +19,7 @@ int main() {
     fp = fopen("capture_test.ts", "wb");
     assert(fp != NULL);
 
-    ret = zzcapture_init(&hcap, stderr);
+    ret = zzcapture_init(&hcap, &param, stderr);
     assert(ret == ZZECODE_OK);
 
     while (frame_size--) {
