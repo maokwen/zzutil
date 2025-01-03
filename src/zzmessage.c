@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <errno.h>
 
 #if defined(_MINGW) || defined(_WIN32)
 #include <winsock2.h>
@@ -166,7 +167,7 @@ int zzmsg_bind_socket(const udp_socket *sock, u16 port, ip_addr *local_ip) {
 
     ret = bind(*(int *)(sock->sock_ptr), (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
     if (ret) {
-        printf("bind() failed, code %d\n", ret);
+        printf("bind() failed, code %d\n", errno);
         return ZZECODE_OS_ERROR;
     }
 #endif
@@ -300,7 +301,15 @@ int zzmsg_close_socket(udp_socket *sock) {
 #endif
 
 #ifdef _UNIX
-    close(*(int *)(sock->sock_ptr));
+    int ret;
+
+    shutdown(*(int *)(sock->sock_ptr), SHUT_RD);
+    ret = close(*(int *)(sock->sock_ptr));
+    if (ret != 0) {
+        printf("close() failed %d\n", errno);
+        return ZZECODE_OS_ERROR;
+    }
+
     free(sock->sock_ptr);
     sock->sock_ptr = NULL;
 #endif
@@ -570,9 +579,10 @@ int set_socket_reusable(const udp_socket *sock) {
 #endif
 
 #ifdef _UNIX
-    int ret = 0;
+    int ret;
     int *psock = (int *)sock->sock_ptr;
-    setsockopt(*(int *)(sock->sock_ptr), SOL_SOCKET, SO_REUSEADDR, (char *)&ret, sizeof(ret));
+    int on = 1;
+    ret = setsockopt(*(int *)(sock->sock_ptr), SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on));
     if (ret) {
         printf("setsockopt(reusable) failed, code %d\n", ret);
         return ZZECODE_OS_ERROR;
