@@ -81,7 +81,7 @@ void free_hcap(hcap_t *hcap) {
     }
 }
 
-int init_input(hcap_t *hcap) {
+int new_input(hcap_t *hcap) {
     int ret;
 #ifdef _WIN32
     const char *ifmt_name = "gdigrab";
@@ -183,7 +183,7 @@ int init_input(hcap_t *hcap) {
     return ZZECODE_OK;
 }
 
-int init_output(hcap_t *hcap, const parm_t *parm) {
+int new_output(hcap_t *hcap, const parm_t *parm) {
     int ret;
 
     const AVOutputFormat *ofmt = av_guess_format("mpegts", NULL, NULL);
@@ -248,7 +248,7 @@ int init_output(hcap_t *hcap, const parm_t *parm) {
     return ZZECODE_OK;
 }
 
-int init_frame_buffer(hcap_t *hcap) {
+int new_frame_buffer(hcap_t *hcap) {
     int ret;
     AVCodecContext *icodec_ctx = hcap->icodec_ctx;
     AVCodecContext *ocodec_ctx = hcap->ocodec_ctx;
@@ -277,7 +277,7 @@ int init_frame_buffer(hcap_t *hcap) {
     return ZZECODE_OK;
 }
 
-int init_scale(hcap_t *hcap) {
+int new_scale(hcap_t *hcap) {
     AVCodecContext *icodec_ctx = hcap->icodec_ctx;
     AVCodecContext *ocodec_ctx = hcap->ocodec_ctx;
 
@@ -296,11 +296,8 @@ int init_scale(hcap_t *hcap) {
     return ZZECODE_OK;
 }
 
-int init(hcap_t **hcap, const parm_t *parm) {
+int new_handle(hcap_t **hcap, const parm_t *parm) {
     int ret;
-
-    // regidter all devices
-    avdevice_register_all();
 
     hcap_t *h = (*hcap) = malloc(sizeof(hcap_t));
     h->is_initialized = false;
@@ -315,14 +312,14 @@ int init(hcap_t **hcap, const parm_t *parm) {
     struct SwsContext *sws_ctx = h->sws_ctx = NULL;
 
     // 1. initialize input format & codec context
-    ret = init_input(h);
+    ret = new_input(h);
     if (ret != ZZECODE_OK) {
         free_hcap(h);
         return ret;
     }
 
     // 2. initialize output format & codec context
-    ret = init_output(h, parm);
+    ret = new_output(h, parm);
     if (ret != ZZECODE_OK) {
         free_hcap(h);
         return ret;
@@ -334,14 +331,14 @@ int init(hcap_t **hcap, const parm_t *parm) {
     }
 
     // 3. initialize freame buffer
-    ret = init_frame_buffer(h);
+    ret = new_frame_buffer(h);
     if (ret != ZZECODE_OK) {
         free_hcap(h);
         return ret;
     }
 
     // 4. initialize scale context
-    ret = init_scale(h);
+    ret = new_scale(h);
     if (ret != ZZECODE_OK) {
         free_hcap(h);
         return ret;
@@ -439,13 +436,40 @@ int get_ts_packet(const hcap_t *hcap, uint8_t **data, size_t *len) {
     return ZZECODE_OK;
 }
 
+int release(hcap_t *hcap) {
+    avformat_free_context(hcap->ifmt_ctx);
+    avcodec_free_context(&hcap->icodec_ctx);
+    avformat_free_context(hcap->ofmt_ctx);
+    avcodec_free_context(&hcap->ocodec_ctx);
+    av_frame_free(&hcap->iframe);
+    av_frame_free(&hcap->oframe);
+    sws_freeContext(hcap->sws_ctx);
+
+    free(hcap);
+    return ZZECODE_OK;
+}
+
 // exports
 
-int zzcapture_init(zzcapture_handle_t **hcap, const zzcapture_param_t *param, FILE *log) {
+void zzcapture_init() {
+    // regidter all devices
+    avdevice_register_all();
+}
+
+int zzcapture_new(zzcapture_handle_t **phcap, const zzcapture_param_t *param, FILE *log) {
     log_output = log;
-    return init(hcap, param);
+    return new_handle(phcap, param);
 }
 
 int zzcapture_get_ts_packet(const zzcapture_handle_t *hcap, uint8_t **data, size_t *len) {
     return get_ts_packet(hcap, data, len);
+}
+
+int zzcapture_release(zzcapture_handle_t **phcap) {
+    if (*phcap == NULL) {
+        return ZZECODE_DOUBLE_RELEASE;
+    }
+    release(*phcap);
+    *phcap = NULL;
+    return ZZECODE_OK;
 }

@@ -16,7 +16,11 @@ struct zzcapture_param {
     size_t width;
 };
 
-int zzcapture_init(zzcapture_handle_t **hcap, const zzcapture_param_t *param, FILE *log);
+void zzcapture_init();
+
+int zzcapture_new(zzcapture_handle_t **phcap, const zzcapture_param_t *param, FILE *log);
+
+int zzcapture_release(zzcapture_handle_t **phcap);
 
 int zzcapture_get_ts_packet(const zzcapture_handle_t *hcap, uint8_t **data, size_t *len);
 
