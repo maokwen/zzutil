@@ -5,7 +5,7 @@
 
 int main() {
     int ret;
-    int frame_size = 200;
+    int frame_size = 10000;
     zzcapture_handle_t *hcap;
     zzcapture_param_t param = {
         .bit_rate = 40000,
@@ -27,6 +27,8 @@ int main() {
         assert(ret == ZZECODE_OK);
 
         fwrite(data, 1, len, fp);
+
+        free(data);
     }
 
     fclose(fp);

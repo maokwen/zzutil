@@ -433,6 +433,9 @@ int get_ts_packet(const hcap_t *hcap, uint8_t **data, size_t *len) {
         memcpy(*data, opacket->data, opacket->size);
     }
 
+    av_packet_free(&ipacket);
+    av_packet_free(&opacket);
+
     return ZZECODE_OK;
 }
 
