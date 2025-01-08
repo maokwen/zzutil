@@ -1,6 +1,4 @@
 #include "zzutil/zzcrypt.h"
-#include "common/helper.h"
-#include "skf_type.h"
 
 #include <openssl/x509.h>
 #include <stdio.h>
@@ -22,6 +20,8 @@
 
 #include <zzutil/zzcrypt.h>
 #include <zzutil/errmsg.h>
+
+#include "common/helper.h"
 
 /************************************************************
  * Declears

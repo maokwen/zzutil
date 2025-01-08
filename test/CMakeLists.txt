@@ -5,47 +5,47 @@ project(zzutil-test VERSION 0.1.0 LANGUAGES C)
 # # # ##
 # message
 
-add_executable(UdpSender
+add_executable(test_udpsender
     testutil.c
-    udpsender.c
+    test_message_udpsender.c
 )
-set_target_properties(UdpSender PROPERTIES WIN32_EXECUTABLE OFF)
-target_link_libraries(UdpSender zzutil::zzmessage)
+set_target_properties(test_udpsender PROPERTIES WIN32_EXECUTABLE OFF)
+target_link_libraries(test_udpsender zzutil::zzmessage)
 
-add_executable(UdpReceiver
+add_executable(test_udpreceiver
     testutil.c
-    udpreceiver.c
+    test_message_udpreceiver.c
 )
-set_target_properties(UdpReceiver PROPERTIES WIN32_EXECUTABLE OFF)
-target_link_libraries(UdpReceiver zzutil::zzmessage)
+set_target_properties(test_udpreceiver PROPERTIES WIN32_EXECUTABLE OFF)
+target_link_libraries(test_udpreceiver zzutil::zzmessage)
 
 # # # ##
 # cache
 
-add_executable(CacheTest
+add_executable(test_cache
     testutil.c
-    cachetest.c
+    test_cache.c
 )
-set_target_properties(CacheTest PROPERTIES WIN32_EXECUTABLE OFF)
-target_link_libraries(CacheTest zzutil::zzcache)
+set_target_properties(test_cache PROPERTIES WIN32_EXECUTABLE OFF)
+target_link_libraries(test_cache zzutil::zzcache)
 
 # # # ##
 # crypt
 
-add_executable(CryptTest
+add_executable(test_crypt
     testutil.c
-    crypt_test.c
+    test_crypt.c
 )
 
-target_link_libraries(CryptTest zzcrypt zzhex)
+target_link_libraries(test_crypt zzcrypt zzhex)
 
 # # # ##
 # capture
 
-add_executable(CaptureTest
+add_executable(test_capture
     testutil.c
-    capture_test.c
+    test_capture.c
 )
 
-target_link_libraries(CaptureTest zzutil::zzcapture)
+target_link_libraries(test_capture zzutil::zzcapture)
 

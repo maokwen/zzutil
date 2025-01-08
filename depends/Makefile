@@ -2,6 +2,23 @@ mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 current_dir := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 project_dir := $(shell dirname $(current_dir))
 
+all: ffmpeg openssl
+
+openh264-2.5.0.tar.gz:
+	@echo "Downloading openh264-2.2.1.tar.gz"
+	@curl -o openh264-2.2.1.tar.gz https://github.com/cisco/openh264/archive/refs/tags/v2.5.0.tar.gz
+
+openh264-2.5.0: openh264-2.5.0.tar.gz
+	@echo "Unzipping openh264-2.5.0.tar.gz"
+	@tar -xf openh264-2.5.0.tar.gz
+
+openh264: openh264-2.5.0
+	@echo "Installing openh264"
+	@cd openh264-2.5.0 && \
+	./configure --prefix=$(project_dir)/lib/openh264 && \
+	make -j && \
+	make install
+
 ffmpeg-4.4.5.tar.xz:
 	@echo "Downloading ffmpeg-4.4.5.tar.xz"
 	@curl -O https://ffmpeg.org/releases/ffmpeg-4.4.5.tar.xz
@@ -30,7 +47,6 @@ configure-ffmpeg: ffmpeg-4.4.5 ffmpeg-4.4.5/ffbuild/config.mak
         --enable-avcodec \
         --enable-swscale \
         --enable-swresample \
-        --enable-xlib \
         --disable-doc \
         --enable-indev=xcbgrab \
         --enable-decoder=rawvideo \

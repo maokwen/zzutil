@@ -29,11 +29,6 @@
 #include <netpacket/packet.h>
 #endif
 
-typedef uint8_t u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
-
 struct _zzmsg_udp_socket {
 #ifdef _WIN32
     void *sock_ptr;

@@ -847,15 +847,15 @@ int main() {
     // test_sm4_ecb_padding_zero(hdev);
     // test_sm4_ecb_padding_pkcs5(hdev);
     // test_sm4_cbc(hdev);
-    test_sm4_ecb_17(hdev);
+    // test_sm4_ecb_17(hdev);
     // test_sm4_ecb_long(hdev);
     // test_sm2(hdev);
     // test_sm2_from_hex(hdev);
     // test_sm2_gw(hdev);
     // test_sm2_long(hdev);
     // test_file(hdev);
-    // test_loadpem(hdev);
-    // test_load_gw_pubkey(hdev);
+    test_loadpem(hdev);
+    test_load_gw_pubkey(hdev);
 
     pasue_on_exit();
     return 0;

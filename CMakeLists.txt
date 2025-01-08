@@ -59,54 +59,88 @@ message("importTargets: " ${importTargets})
 
 add_library(zzcommon STATIC src/common/helper.c)
 
-target_include_directories(
-  zzcommon PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-                  $<INSTALL_INTERFACE:include>)
-set_property(TARGET zzcommon PROPERTY VERSION ${version})
-set_property(TARGET zzcommon PROPERTY SOVERSION 0)
-set_property(TARGET zzcommon PROPERTY INTERFACE_zzcommon_MAJOR_VERSION 1)
+target_include_directories(zzcommon
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
+set_target_properties(zzcommon
+    PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION 0
+        INTERFACE_zzcommon_MAJOR_VERSION 1
+)
 
 # ====== hex
 
 add_library(zzhex SHARED src/zzhex.c)
-set_property(TARGET zzhex PROPERTY VERSION ${version})
-set_property(TARGET zzhex PROPERTY SOVERSION 0)
-set_property(TARGET zzhex PROPERTY INTERFACE_zzhex_MAJOR_VERSION 1)
+add_library(zzutil::zzhex ALIAS zzhex)
 
-target_include_directories(
-  zzhex PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-               $<INSTALL_INTERFACE:include>)
+set_target_properties(zzhex
+    PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION 0
+        INTERFACE_zzhex_MAJOR_VERSION 1
+)
 
-target_link_libraries(zzhex PRIVATE zzcommon)
+target_include_directories(zzhex
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
+
+target_link_libraries(zzhex
+    PRIVATE
+        zzcommon
+)
 
 # ====== crypt
 
 add_library(zzcrypt SHARED src/zzcrypt.c)
-set_property(TARGET zzcrypt PROPERTY VERSION ${version})
-set_property(TARGET zzcrypt PROPERTY SOVERSION 0)
-set_property(TARGET zzcrypt PROPERTY INTERFACE_zzcrypt_MAJOR_VERSION 1)
+add_library(zzutil::zzcrypt ALIAS zzcrypt)
+
+set_target_properties(zzcrypt
+    PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION 0
+        INTERFACE_zzcrypt_MAJOR_VERSION 1
+)
 
 get_target_property(SKF_INCLUDE_DIR skf INTERFACE_INCLUDE_DIRECTORIES)
-target_include_directories(zzcrypt PRIVATE ${SKF_INCLUDE_DIR})
-target_include_directories(
-  zzcrypt PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-                 $<INSTALL_INTERFACE:include>)
+target_include_directories(zzcrypt
+    PRIVATE
+        ${SKF_INCLUDE_DIR}
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
 
-target_link_libraries(zzcrypt PRIVATE zzcommon OpenSSL::SSL OpenSSL::Crypto)
+target_link_libraries(zzcrypt
+    PRIVATE
+        zzcommon
+        OpenSSL::SSL
+        OpenSSL::Crypto
+)
 
 if(WIN32)
     add_custom_command(
-    OUTPUT ${PROJECT_BINARY_DIR}/skf.dll
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:skf>
+        OUTPUT
             ${PROJECT_BINARY_DIR}/skf.dll
-    COMMENT "Copying dll to build directory")
+        COMMAND
+            ${CMAKE_COMMAND} -E copy $<TARGET_FILE:skf>
+            ${PROJECT_BINARY_DIR}/skf.dll
+        COMMENT
+            "Copying dll to build directory")
     add_custom_target(skf_runtime DEPENDS ${PROJECT_BINARY_DIR}/skf.dll)
 elseif(UNIX)
     add_custom_command(
-    OUTPUT ${PROJECT_BINARY_DIR}/libskf.so
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:skf>
+        OUTPUT
             ${PROJECT_BINARY_DIR}/libskf.so
-    COMMENT "Copying so to build directory")
+        COMMAND
+            ${CMAKE_COMMAND} -E copy $<TARGET_FILE:skf>
+            ${PROJECT_BINARY_DIR}/libskf.so
+        COMMENT
+            "Copying so to build directory")
     add_custom_target(skf_runtime DEPENDS ${PROJECT_BINARY_DIR}/libskf.so)
 endif()
 add_dependencies(zzcrypt skf_runtime)
@@ -114,62 +148,95 @@ add_dependencies(zzcrypt skf_runtime)
 # ====== message
 
 add_library(zzmessage SHARED src/zzmessage.c)
-set_property(TARGET zzmessage PROPERTY VERSION ${version})
-set_property(TARGET zzmessage PROPERTY SOVERSION 0)
-set_property(TARGET zzmessage PROPERTY INTERFACE_zzmessage_MAJOR_VERSION 1)
+add_library(zzutil::zzmessage ALIAS zzmessage)
 
-target_include_directories(
-  zzmessage PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-                   $<INSTALL_INTERFACE:include>)
+set_target_properties(zzmessage
+    PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION 0
+        INTERFACE_zzcrypt_MAJOR_VERSION 1
+)
+
+target_include_directories(zzmessage
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>)
 
 if(WIN32)
     set(ZZMESSAGE_ADDITIONAL_LIBS wsock32 ws2_32 iphlpapi)
 endif(WIN32)
 
-target_link_libraries(zzmessage PRIVATE zzcommon ${ZZMESSAGE_ADDITIONAL_LIBS})
-
-add_library(zzutil::zzmessage ALIAS zzmessage)
+target_link_libraries(zzmessage
+    PRIVATE
+        zzcommon
+        ${ZZMESSAGE_ADDITIONAL_LIBS}
+)
 
 # ====== cache
 
 add_library(zzcache SHARED src/zzcache.c)
-set_property(TARGET zzcache PROPERTY VERSION ${version})
-set_property(TARGET zzcache PROPERTY SOVERSION 0)
-set_property(TARGET zzcache PROPERTY INTERFACE_zzcache_MAJOR_VERSION 1)
+add_library(zzutil::zzcache ALIAS zzcache)
 
-target_include_directories(
-  zzcache PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-                 $<INSTALL_INTERFACE:include>)
+set_target_properties(zzcache
+    PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION 0
+        INTERFACE_zzcrypt_MAJOR_VERSION 1
+)
+
+target_include_directories(zzcache
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
 
 if(UNIX)
     set(ZZCACHE_ADDITIONAL_LIBS pthread)
 endif()
 
-target_link_libraries(zzcache PRIVATE zzcommon ${ZZCACHE_ADDITIONAL_LIBS})
-
-add_library(zzutil::zzcache ALIAS zzcache)
+target_link_libraries(zzcache
+    PRIVATE
+        zzcommon
+        ${ZZCACHE_ADDITIONAL_LIBS}
+)
 
 # ====== capture
 
 add_library(zzcapture SHARED src/zzcapture.c)
-set_property(TARGET zzcapture PROPERTY VERSION ${version})
-set_property(TARGET zzcapture PROPERTY SOVERSION 0)
-set_property(TARGET zzcapture PROPERTY INTERFACE_zzcapture_MAJOR_VERSION 1)
+add_library(zzutil::zzcapture ALIAS zzcapture)
 
-target_include_directories(
-  zzcapture PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-                   $<INSTALL_INTERFACE:include>)
-
-target_link_libraries(zzcapture PRIVATE
-    ffmpeg::avformat # should before avcodec for `av_bitstream_filter_filter`
-    ffmpeg::avcodec
-    ffmpeg::avdevice
-    ffmpeg::avutil
-    ffmpeg::swscale
-    ${ZZCAPTURE_ADDITIONAL_LIBS}
+set_target_properties(zzcapture
+    PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION 0
+        INTERFACE_zzcrypt_MAJOR_VERSION 1
 )
 
-add_library(zzutil::zzcapture ALIAS zzcapture)
+target_include_directories(zzcapture
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
+
+target_link_libraries(zzcapture
+    PRIVATE
+        ffmpeg::avformat # should before avcodec for `av_bitstream_filter_filter`
+        ffmpeg::avcodec
+        ffmpeg::avdevice
+        ffmpeg::avutil
+        ffmpeg::swscale
+        ${FFMPEG_ADDITIONAL_LIBS}
+)
+
+add_custom_command(
+    TARGET zzcapture
+    POST_BUILD
+    COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:openh264>
+            $<TARGET_FILE_DIR:zzcapture>
+    COMMENT "copy openh264 to output directory"
+)
 
 # ====== Cross compile
 
@@ -197,8 +264,7 @@ install(
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
   RUNTIME DESTINATION bin
-  INCLUDES
-  DESTINATION include)
+  INCLUDES DESTINATION include)
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/zzutil
         DESTINATION include)
@@ -227,4 +293,10 @@ if(WIN32)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/skf.dll DESTINATION bin)
 elseif(UNIX)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libskf.so DESTINATION bin)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libopenh264.so.2.5.0 DESTINATION lib)
+    # install(TARGETS zzcapture
+    #     RUNTIME_DEPENDENCIES
+    #     DESTINATION lib
+    # )
 endif()
+
