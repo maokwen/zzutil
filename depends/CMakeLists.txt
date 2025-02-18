@@ -46,7 +46,6 @@ ExternalProject_Add(ffmpeg
             --enable-avcodec
             --enable-swscale
             --enable-swresample
-            --enable-xlib
             --disable-doc
             --enable-indev=xcbgrab
             --enable-decoder=rawvideo
