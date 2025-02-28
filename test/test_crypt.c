@@ -827,6 +827,14 @@ void test_load_gw_pubkey(zzcrypt_devhandle_p hdev) {
     zzhex_print_data_hex("enc_data", pubkey, 64);
 }
 
+void test_device_remove(zzcrypt_devhandle_p hdev) {
+    while (true) {
+        int ret = zzcrypt_dev_exists(hdev);
+        printf("%d\n", ret);
+        dosleep(1000);
+    }
+}
+
 int main() {
     int ret;
 
@@ -854,8 +862,9 @@ int main() {
     // test_sm2_gw(hdev);
     // test_sm2_long(hdev);
     // test_file(hdev);
-    test_loadpem(hdev);
-    test_load_gw_pubkey(hdev);
+    // test_loadpem(hdev);
+    // test_load_gw_pubkey(hdev);
+    test_device_remove(hdev);
 
     pasue_on_exit();
     return 0;

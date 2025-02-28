@@ -222,4 +222,6 @@ int zzcrypt_appinfo(const zzcrypt_apphandle_t *happ, zzcrypt_appinfo_t *info);
 
 int zzcrypt_boot_from_dev(const zzcrypt_devhandle_t *hdev);
 
+int zzcrypt_dev_exists(const zzcrypt_devhandle_t *hdev);
+
 #endif // ZZUTIL_ZZCRYPT_H

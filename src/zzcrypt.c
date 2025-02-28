@@ -68,6 +68,7 @@ static bool check_boot_from_usb();
 struct _zzcrypt_devhandle {
     skf_handle_t skf_handle;
     bool is_initialized;
+    char dev_name[256];
     char ukey_path[256];
     char exec_path[256];
 };
@@ -143,6 +144,7 @@ int zzcrypt_init(hdev_t **hdev, FILE *log) {
 
     strncpy(h->exec_path, exec_path, strlen(h->exec_path));
     strncpy(h->ukey_path, devices, strlen(h->ukey_path));
+    strcpy(h->dev_name, devices);
 
     /* connect device */
     ret = FunctionList->SKF_ConnectDev(devices, &h->skf_handle);
@@ -1142,6 +1144,22 @@ int zzcrypt_sm2_get_pubkey_from_file(const hdev_t *hdev, const happ_t *happ, con
     *pubkey_out = malloc(64);
     memcpy(*pubkey_out, pubkey, 64);
 
+    return ZZECODE_OK;
+}
+
+int zzcrypt_dev_exists(const hdev_t *hdev) {
+    u32 ret;
+    if (!hdev->is_initialized) {
+        return ZZECODE_NO_INIT;
+    }
+    u32 pulDevState;
+    ret = FunctionList->SKF_GetDevState(hdev->dev_name, &pulDevState);
+    if (skf_error("SKF_GetDevState", ret)) {
+        return ZZECODE_SKF_ERR;
+    }
+    if (pulDevState != 1) {
+        return ZZECODE_CRYPT_NO_DEVICE;
+    };
     return ZZECODE_OK;
 }
 
