@@ -835,6 +835,11 @@ void test_device_remove(zzcrypt_devhandle_p hdev) {
     }
 }
 
+void test_zzcrypt_boot_from_dev(zzcrypt_devhandle_p hdev) {
+    int ret = zzcrypt_boot_from_dev(hdev);
+    assert(ret == ZZECODE_CRYPT_WRONG_LOAD_POSITION);
+}
+
 int main() {
     int ret;
 
@@ -864,7 +869,8 @@ int main() {
     // test_file(hdev);
     // test_loadpem(hdev);
     // test_load_gw_pubkey(hdev);
-    test_device_remove(hdev);
+    // test_device_remove(hdev);
+    test_zzcrypt_boot_from_dev(hdev);
 
     pasue_on_exit();
     return 0;

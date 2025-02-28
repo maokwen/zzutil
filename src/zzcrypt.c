@@ -9,6 +9,8 @@
 #ifdef _UNIX
 #include <unistd.h>
 #include <dlfcn.h>
+#include <mntent.h>
+#include <sys/stat.h>
 #endif
 
 #define OPENSSL_API_COMPAT 30000
@@ -40,7 +42,7 @@ static const u32 DeviceLockTimeout = 5000;
 static FILE *log_output = NULL;
 static const size_t VectorBufInitSize = 256;
 
-static bool load_library();
+static bool load_library(const char *exec_path);
 static size_t sm2_sizeof_encoded_data(size_t cipher_len);
 static void print_device_info(skf_handle_t hdev);
 static bool skf_error(const char *msg, int ret);
@@ -53,7 +55,12 @@ static size_t unpadding_zero(hkey_t *hkey);
 static size_t unpadding_pkcs7(hkey_t *hkey);
 static u8 *datdat(const u8 *dat1, size_t len1, const u8 *dat2, size_t len2);
 static bool get_exec_path(char *buf, size_t len);
-static bool check_boot_from_usb();
+
+#ifdef _UNIX
+static char *get_device_from_mounts(dev_t dev);
+static void read_sysfs_file(const char *device, const char *filename, char *result);
+static int get_device_numbers(const char *dev, int *major, int *minor);
+#endif
 
 #define LOG(fmt, ...)                              \
     if (log_output) {                              \
@@ -69,7 +76,6 @@ struct _zzcrypt_devhandle {
     skf_handle_t skf_handle;
     bool is_initialized;
     char dev_name[256];
-    char ukey_path[256];
     char exec_path[256];
 };
 
@@ -103,7 +109,6 @@ struct _zzcrypt_ctnhandle {
 int zzcrypt_init(hdev_t **hdev, FILE *log) {
     int ret;
     char devices[512] = {0};
-    char exec_path[512] = {0};
     char app_name_buf[128];
     u32 devices_size = sizeof(devices);
 
@@ -117,7 +122,11 @@ int zzcrypt_init(hdev_t **hdev, FILE *log) {
         return ZZECODE_CRYPT_ALREADY_INIT;
     }
 
-    if (!load_library()) {
+    if (!get_exec_path(h->exec_path, sizeof(h->exec_path))) {
+        return false;
+    }
+
+    if (!load_library(h->exec_path)) {
         LOG("failed to load library");
         return ZZECODE_OS_ERROR;
     }
@@ -142,8 +151,6 @@ int zzcrypt_init(hdev_t **hdev, FILE *log) {
         return ZZECODE_CRYPT_NO_DEVICE;
     }
 
-    strncpy(h->exec_path, exec_path, strlen(h->exec_path));
-    strncpy(h->ukey_path, devices, strlen(h->ukey_path));
     strcpy(h->dev_name, devices);
 
     /* connect device */
@@ -861,58 +868,40 @@ int zzcrypt_boot_from_dev(const hdev_t *hdev) {
         return ZZECODE_NO_INIT;
     }
 
+#ifdef _WIN32
     // windows: check label: ukey_path[0] == exec_path[0]
     if (hdev->ukey_path[0] == hdev->exec_path[0]) {
         return ZZECODE_OK;
     }
+#endif
 
+#ifdef _UNIX
     // linux: udevadm info /dev/sg0
-    char exec_dev_path[2048];
-    char ukey_dev_path[2048];
-    char buf[2048];
+    LOG("dev name: %s\n", hdev->dev_name);
+    LOG("exec path: %s\n", hdev->exec_path);
 
-    /* 1. get exec dev info */ {
-        /* get mount point */ {
-            strncpy(buf, "df -P ", sizeof(buf));
-            strncat(buf, hdev->exec_path, sizeof(buf) - strlen(buf) - 1);
-            FILE *fp = popen(buf, "r");
-            if (fp == NULL) {
-                return ZZECODE_OS_ERROR;
-            }
-            if (fgets(exec_dev_path, sizeof(buf), fp) == NULL) {
-                pclose(fp);
-                return ZZECODE_OS_ERROR;
-            }
-        }
-        strncpy(buf, "udevadm info ", sizeof(buf));
-        strncat(buf, exec_dev_path, sizeof(buf) - strlen(buf) - 1);
-        strncat(buf, "| grep -x \"P: .*\" -m 1", sizeof(buf) - strlen(buf) - 1);
-        FILE *fp = popen(buf, "r");
-        if (fp == NULL) {
-            return ZZECODE_OS_ERROR;
-        }
-        if (fgets(ukey_dev_path, sizeof(buf), fp) == NULL) {
-            pclose(fp);
-            return ZZECODE_OS_ERROR;
-        }
+    char dev_name[2048];
+    strcpy(dev_name, "/dev/");
+    strcpy(dev_name + 5, hdev->dev_name);
+    LOG("dev name: %s\n", dev_name);
+
+    struct stat statbuf;
+    if (stat(hdev->exec_path, &statbuf) == -1) {
+        return ZZECODE_CRYPT_WRONG_LOAD_POSITION;
     }
-    /* 2. get ukey dev info */ {
-        strncpy(buf, "udevadm info ", sizeof(buf));
-        strncat(buf, hdev->ukey_path, sizeof(buf) - strlen(buf) - 1);
-        strncat(buf, "| grep -x \"P: .*\" -m 1", sizeof(buf) - strlen(buf) - 1);
-        FILE *fp = popen(buf, "r");
-        if (fp == NULL) {
-            return ZZECODE_OS_ERROR;
-        }
-        if (fgets(ukey_dev_path, sizeof(buf), fp) == NULL) {
-            pclose(fp);
-            return ZZECODE_OS_ERROR;
-        }
+    char *exec_dev_name = get_device_from_mounts(statbuf.st_dev);
+    LOG("exec dev name: %s\n", exec_dev_name);
+
+    int exec_major, exec_minor;
+    int dev_major, dev_minor;
+    get_device_numbers(exec_dev_name, &exec_major, &exec_minor);
+    get_device_numbers(dev_name, &dev_major, &dev_minor);
+    LOG("exec %d:%d\ndev  %d:%d\n", exec_major, exec_minor, dev_major, dev_minor);
+
+    if (exec_major == dev_major && exec_minor == dev_minor) {
+        return ZZECODE_OK;
     }
-
-    FILE *fp = popen(buf, "r");
-
-    LOG("device ");
+#endif
 
     return ZZECODE_CRYPT_WRONG_LOAD_POSITION;
 }
@@ -1153,7 +1142,7 @@ int zzcrypt_dev_exists(const hdev_t *hdev) {
         return ZZECODE_NO_INIT;
     }
     u32 pulDevState;
-    ret = FunctionList->SKF_GetDevState(hdev->dev_name, &pulDevState);
+    ret = FunctionList->SKF_GetDevState((char *)(hdev->dev_name), &pulDevState);
     if (skf_error("SKF_GetDevState", ret)) {
         return ZZECODE_SKF_ERR;
     }
@@ -1167,14 +1156,11 @@ int zzcrypt_dev_exists(const hdev_t *hdev) {
  * Internal functions
  ************************************************************/
 
-bool load_library() {
+bool load_library(const char *exec_path) {
     int ret = 0;
     void *lib_handle = NULL;
-    char path[512] = {0};
-
-    if (!get_exec_path(path, 512)) {
-        return false;
-    }
+    char path[1024] = {0};
+    strcpy(path, exec_path);
 
     P_SKF_GetFuncList get_func_list = NULL;
 #ifdef _WIN32
@@ -1401,3 +1387,65 @@ bool get_exec_path(char *buf, size_t len) {
         return false;
     }
 }
+
+#ifdef _UNIX
+
+#define MOUNT_FILE "/proc/mounts"
+
+// 获取挂载点对应的设备路径
+char *get_device_from_mounts(dev_t dev) {
+    FILE *fp = fopen(MOUNT_FILE, "r");
+    if (!fp) {
+        perror("fopen");
+        return NULL;
+    }
+
+    static char device[256], mountpoint[256], fstype[256], options[256];
+    int dump, pass;
+    while (fscanf(fp, "%255s %255s %255s %255s %d %d\n",
+                  device, mountpoint, fstype, options, &dump, &pass) != EOF) {
+        struct stat statbuf;
+        if (stat(mountpoint, &statbuf) == 0 && statbuf.st_dev == dev) {
+            fclose(fp);
+            return strdup(device);
+        }
+    }
+
+    fclose(fp);
+    return NULL;
+}
+
+#define SYSFS_PATH "/sys/class/scsi_generic/%s/device/%s"
+
+// 读取 sysfs 文件内容
+void read_sysfs_file(const char *device, const char *filename, char *result) {
+    char path[256];
+    snprintf(path, sizeof(path), SYSFS_PATH, device, filename);
+
+    FILE *file = fopen(path, "r");
+    if (file) {
+        char buffer[64];
+        if (fgets(buffer, sizeof(buffer), file)) {
+            strcpy(result, buffer);
+        }
+        fclose(file);
+    } else {
+        perror("fopen");
+    }
+}
+
+#include <sys/sysmacros.h>
+
+// 获取设备的 major 和 minor 号
+int get_device_numbers(const char *dev, int *major, int *minor) {
+    struct stat statbuf;
+    if (stat(dev, &statbuf) == -1) {
+        perror("stat");
+        return -1;
+    }
+    *major = major(statbuf.st_rdev);
+    *minor = minor(statbuf.st_rdev);
+    return 0;
+}
+
+#endif
