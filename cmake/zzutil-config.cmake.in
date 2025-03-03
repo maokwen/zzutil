@@ -3,7 +3,22 @@ include("${CMAKE_CURRENT_LIST_DIR}/zzutil-targets.cmake")
 check_required_components(zzutil)
 
 if(WIN32)
-    set(ZZUTIL_CRYPT_RUNTIME ${CMAKE_CURRENT_LIST_DIR}/../../../bin/skf.dll)
+    set(ZZUTIL_CRYPT_RUNTIME
+        ${CMAKE_CURRENT_LIST_DIR}/../../../bin/skf.dll
+        ${CMAKE_CURRENT_LIST_DIR}/../../../bin/libcrypto-3.dll
+        ${CMAKE_CURRENT_LIST_DIR}/../../../bin/libssl-3.dll
+    )
+    set(ZZUTIL_CAPTURE_RUNTIME
+        ${CMAKE_CURRENT_LIST_DIR}/../../../bin/avcodec-58.dll
+        ${CMAKE_CURRENT_LIST_DIR}/../../../bin/avdevice-58.dll
+        ${CMAKE_CURRENT_LIST_DIR}/../../../bin/avfilter-7.dll
+        ${CMAKE_CURRENT_LIST_DIR}/../../../bin/avformat-58.dll
+        ${CMAKE_CURRENT_LIST_DIR}/../../../bin/avutil-56.dll
+        ${CMAKE_CURRENT_LIST_DIR}/../../../bin/swresample-3.dll
+        ${CMAKE_CURRENT_LIST_DIR}/../../../bin/swscale-5.dll
+        ${CMAKE_CURRENT_LIST_DIR}/../../../bin/postproc-55.dll
+        ${CMAKE_CURRENT_LIST_DIR}/../../../bin/libopenh264-7.dll
+    )
 elseif(UNIX)
     set(ZZUTIL_CRYPT_RUNTIME ${CMAKE_CURRENT_LIST_DIR}/../../../bin/libskf.so)
     set(ZZUTIL_CAPTURE_EXTRA_LIB ${CMAKE_CURRENT_LIST_DIR}/../../../lib/libopenh264.so.2.5.0)

@@ -6,6 +6,8 @@ if(WIN32)
     add_library(ffmpeg::avutil SHARED IMPORTED)
     add_library(ffmpeg::swresample SHARED IMPORTED)
     add_library(ffmpeg::swscale SHARED IMPORTED)
+    add_library(ffmpeg::postproc SHARED IMPORTED)
+    add_library(openh264 SHARED IMPORTED)
 
     set_target_properties(
         ffmpeg::avcodec
@@ -15,7 +17,7 @@ if(WIN32)
         ffmpeg::avutil
         ffmpeg::swresample
         ffmpeg::swscale
-        ffmpeg::avcodec
+        ffmpeg::postproc
         PROPERTIES
             INTERFACE_INCLUDE_DIRECTORIES
             ${CMAKE_SOURCE_DIR}/lib/ffmpeg/include)
@@ -71,6 +73,26 @@ if(WIN32)
             IMPORTED_IMPLIB
             ${CMAKE_SOURCE_DIR}/lib/ffmpeg/libwin32/swscale.lib)
 
+    set_target_properties(
+        ffmpeg::postproc
+        PROPERTIES
+            IMPORTED_LOCATION
+            ${CMAKE_SOURCE_DIR}/lib/ffmpeg/libwin32/postproc-55.dll
+            IMPORTED_IMPLIB
+            ${CMAKE_SOURCE_DIR}/lib/ffmpeg/libwin32/postproc.lib)
+
+    set_target_properties(
+        openh264
+        PROPERTIES
+            IMPORTED_LOCATION
+            ${CMAKE_SOURCE_DIR}/lib/openh264/libwin32/libopenh264-7.dll
+            IMPORTED_IMPLIB
+            ${CMAKE_SOURCE_DIR}/lib/openh264/libwin32/libopenh264.dll.a)
+
+    set(FFMPEG_ADDITIONAL_LIBS
+        openh264
+    )
+
 elseif(UNIX)
     add_library(ffmpeg::avcodec STATIC IMPORTED)
     add_library(ffmpeg::avdevice STATIC IMPORTED)
@@ -79,6 +101,7 @@ elseif(UNIX)
     add_library(ffmpeg::avutil STATIC IMPORTED)
     add_library(ffmpeg::swresample STATIC IMPORTED)
     add_library(ffmpeg::swscale STATIC IMPORTED)
+    add_library(openh264 SHARED IMPORTED)
 
     set_target_properties(
         ffmpeg::avcodec
@@ -128,8 +151,7 @@ elseif(UNIX)
             IMPORTED_LOCATION
             ${CMAKE_SOURCE_DIR}/lib/ffmpeg/lib/libswscale.a
     )
-
-    add_library(openh264 SHARED IMPORTED)
+    
     set_target_properties(openh264
         PROPERTIES
             IMPORTED_LOCATION

@@ -127,7 +127,7 @@ int zzcrypt_init(hdev_t **hdev, FILE *log) {
     }
 
     if (!load_library(h->exec_path)) {
-        LOG("failed to load library");
+        LOG("failed to load library\n");
         return ZZECODE_OS_ERROR;
     }
 
@@ -1164,11 +1164,7 @@ bool load_library(const char *exec_path) {
 
     P_SKF_GetFuncList get_func_list = NULL;
 #ifdef _WIN32
-#ifdef _WIN64
-    strcat_s(path, sizeof(path), "\\SKF_ukey_x86_64_1.7.22.0117.dll");
-#else
-    strcat_s(path, sizeof(path), "\\SKF_ukey_i686_1.7.22.0117.dll");
-#endif
+    strcat_s(path, sizeof(path), "\\skf.dll");
     lib_handle = LoadLibrary(path);
     if (lib_handle == NULL) {
         ret = GetLastError();

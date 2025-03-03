@@ -12,6 +12,14 @@ include(lib/skf/cmake/skf.cmake)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 set(CMAKE_COLOR_DIAGNOSTICS ON)
 
+if(WIN32)
+    add_definitions(-DNOMINMAX)
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+      set(CMAKE_C_FLAGS_RELEASE "-O2 -s")
+      set(CMAKE_CXX_FLAGS_RELEASE "-O2 -s")
+    endif()
+endif()
+
 set(EXECUTABLE_OUTPUT_PATH "${CMAKE_CURRENT_LIST_DIR}/build")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_LIST_DIR}/build")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_LIST_DIR}/build")
@@ -248,6 +256,19 @@ if(UNIX)
     )
 endif()
 
+if(UNIX)
+    add_custom_command(
+        TARGET zzcapture
+        POST_BUILD
+        COMMAND
+            ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:openh264>
+                $<TARGET_FILE_DIR:zzcapture>
+        COMMENT "copy openh264 to output directory"
+    )
+endif()
+
+
 # ====== Cross compile
 
 # if(UNIX) set_target_properties(zzcommon PROPERTIES LINK_OPTIONS
@@ -301,6 +322,20 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/zzutil-config.cmake
 
 if(WIN32)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/skf.dll DESTINATION bin)
+    install(FILES
+                $<TARGET_FILE:ffmpeg::avcodec>
+                $<TARGET_FILE:ffmpeg::avdevice>
+                $<TARGET_FILE:ffmpeg::avfilter>
+                $<TARGET_FILE:ffmpeg::avformat>
+                $<TARGET_FILE:ffmpeg::avutil>
+                $<TARGET_FILE:ffmpeg::swresample>
+                $<TARGET_FILE:ffmpeg::swscale>
+                $<TARGET_FILE:ffmpeg::postproc>
+                ${CMAKE_CURRENT_SOURCE_DIR}/lib/openssl/win32/bin/libssl-3.dll
+                ${CMAKE_CURRENT_SOURCE_DIR}/lib/openssl/win32/bin/libcrypto-3.dll
+                $<TARGET_FILE:openh264>
+        DESTINATION bin
+    )
 elseif(UNIX)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libskf.so DESTINATION bin)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libopenh264.so.2.5.0 DESTINATION lib)
