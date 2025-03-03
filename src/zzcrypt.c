@@ -1,6 +1,5 @@
 #include "zzutil/zzcrypt.h"
 
-#include <openssl/x509.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +16,7 @@
 #include <openssl/bio.h>
 #include <openssl/pem.h>
 #include <openssl/core_names.h>
+#include <openssl/x509.h>
 
 #include <skf.h>
 
@@ -870,7 +870,7 @@ int zzcrypt_boot_from_dev(const hdev_t *hdev) {
 
 #ifdef _WIN32
     // windows: check label: ukey_path[0] == exec_path[0]
-    if (hdev->ukey_path[0] == hdev->exec_path[0]) {
+    if (hdev->dev_name[0] == hdev->exec_path[0]) {
         return ZZECODE_OK;
     }
 #endif

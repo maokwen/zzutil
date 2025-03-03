@@ -39,8 +39,16 @@ add_compile_definitions($<$<CONFIG:Debug>:ZZUTIL_DEBUG>
 
 # ====== depends
 
-set(OPENSSL_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/openssl")
-set(OPENSSL_USE_STATIC_LIBS TRUE)
+if(UNIX)
+    set(OPENSSL_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/openssl")
+    set(OPENSSL_USE_STATIC_LIBS TRUE)
+elseif(WIN32)
+    set(OPENSSL_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/openssl/win32")
+    set(OPENSSL_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/openssl/win32/include")
+    set(OPENSSL_CRYPTO_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/lib/openssl/win32/lib/crypto")
+    set(OPENSSL_SSL_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/lib/openssl/win32/lib/ssl")
+    endif()
+message(OPENSSL_ROOT_DIR: ${OPENSSL_ROOT_DIR})
 find_package(OpenSSL REQUIRED)
 
 # set(FFMPEG_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg")
@@ -228,15 +236,17 @@ target_link_libraries(zzcapture
         ${FFMPEG_ADDITIONAL_LIBS}
 )
 
-add_custom_command(
-    TARGET zzcapture
-    POST_BUILD
-    COMMAND
-        ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:openh264>
-            $<TARGET_FILE_DIR:zzcapture>
-    COMMENT "copy openh264 to output directory"
-)
+if(UNIX)
+    add_custom_command(
+        TARGET zzcapture
+        POST_BUILD
+        COMMAND
+            ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:openh264>
+                $<TARGET_FILE_DIR:zzcapture>
+        COMMENT "copy openh264 to output directory"
+    )
+endif()
 
 # ====== Cross compile
 
@@ -256,7 +266,7 @@ add_subdirectory(test)
 # ====== Install
 
 set(CMAKE_INSTALL_PREFIX
-    ${CMAKE_CURRENT_LIST_DIR}/../ZZMaintenanceTool/lib/zzutil)
+    ${CMAKE_CURRENT_LIST_DIR}/../zzmaint/lib/zzutil)
 
 install(
   TARGETS zzhex zzcrypt zzmessage zzcache zzcapture
