@@ -8,7 +8,7 @@
             "type": "codelldb",
             "request": "launch",
             "name": "(lldb) crypt",
-            "program": "${workspaceFolder}/build/CryptTest",
+            "program": "${workspaceFolder}/build/test_crypt",
             "args": [],
             "cwd": "${workspaceFolder}"
         },
@@ -16,7 +16,7 @@
             "name": "(vs) crypt",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/CryptTest.exe",
+            "program": "${workspaceFolder}/build/test_crypt.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
@@ -27,7 +27,7 @@
         },
         {
             "name": "(gdb) crypt",
-            "program": "${workspaceFolder}/build/CryptTest.exe",
+            "program": "${workspaceFolder}/build/test_crypt.exe",
             "type": "cppdbg",
             "request": "launch",
             "args": [],
@@ -36,12 +36,12 @@
             "environment": [],
             "MIMode": "gdb",
             "windows": {
-                "program": "${workspaceFolder}/build/CryptTest.exe",
+                "program": "${workspaceFolder}/build/test_crypt.exe",
                 "miDebuggerPath": "C:\\Qt\\Tools\\mingw530_32\\bin\\gdb.exe",
                 "externalConsole": true,
             },
             "linux": {
-                "program": "${workspaceFolder}/build/CryptTest",
+                "program": "${workspaceFolder}/build/test_crypt",
                 "miDebuggerPath": "/usr/bin/gdb",
                 "externalConsole": false,
             },

@@ -827,6 +827,19 @@ void test_load_gw_pubkey(zzcrypt_devhandle_p hdev) {
     zzhex_print_data_hex("enc_data", pubkey, 64);
 }
 
+void test_device_remove(zzcrypt_devhandle_p hdev) {
+    while (true) {
+        int ret = zzcrypt_dev_exists(hdev);
+        printf("%d\n", ret);
+        dosleep(1000);
+    }
+}
+
+void test_zzcrypt_boot_from_dev(zzcrypt_devhandle_p hdev) {
+    int ret = zzcrypt_boot_from_dev(hdev);
+    assert(ret == ZZECODE_CRYPT_WRONG_LOAD_POSITION);
+}
+
 int main() {
     int ret;
 
@@ -847,7 +860,7 @@ int main() {
     // test_sm4_ecb_padding_zero(hdev);
     // test_sm4_ecb_padding_pkcs5(hdev);
     // test_sm4_cbc(hdev);
-    test_sm4_ecb_17(hdev);
+    // test_sm4_ecb_17(hdev);
     // test_sm4_ecb_long(hdev);
     // test_sm2(hdev);
     // test_sm2_from_hex(hdev);
@@ -856,6 +869,8 @@ int main() {
     // test_file(hdev);
     // test_loadpem(hdev);
     // test_load_gw_pubkey(hdev);
+    // test_device_remove(hdev);
+    test_zzcrypt_boot_from_dev(hdev);
 
     pasue_on_exit();
     return 0;

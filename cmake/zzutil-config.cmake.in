@@ -3,7 +3,9 @@ include("${CMAKE_CURRENT_LIST_DIR}/zzutil-targets.cmake")
 check_required_components(zzutil)
 
 if(WIN32)
-set(ZZUTIL_CRYPT_RUNTIME ${CMAKE_CURRENT_LIST_DIR}/../../../bin/skf.dll)
+    set(ZZUTIL_CRYPT_RUNTIME ${CMAKE_CURRENT_LIST_DIR}/../../../bin/skf.dll)
 elseif(UNIX)
-set(ZZUTIL_CRYPT_RUNTIME ${CMAKE_CURRENT_LIST_DIR}/../../../bin/libskf.so)
+    set(ZZUTIL_CRYPT_RUNTIME ${CMAKE_CURRENT_LIST_DIR}/../../../bin/libskf.so)
+    set(ZZUTIL_CAPTURE_EXTRA_LIB ${CMAKE_CURRENT_LIST_DIR}/../../../lib/libopenh264.so.2.5.0)
 endif()
+

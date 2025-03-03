@@ -1,8 +1,21 @@
-# 网络接口
+# ZZUtil
 
-## 计划
+## build & install
 
-### 平台无关界面
+```sh
+# build depends
+mkdir -p depends/build
+(cd depends/build && cmake .. && cmake --build .)
+# build zzutil
+mkdir -p build
+(cd build && cmake .. && cmake --build . --target install)
+```
+
+## 网络接口
+
+### 计划
+
+#### 平台无关界面
 
 主要解决跨平台 socket 接口不一致的问题（Linux、Windows）。
 
@@ -10,7 +23,7 @@
 
 参见头文件：[zzmessage.h](include/zzutil/zzmessage.h)。
 
-### 数据包缓存
+#### 数据包缓存
 
 引入缓存的根据：
 
